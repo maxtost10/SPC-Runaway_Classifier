@@ -37,3 +37,15 @@ git status                          # Check the current branch and the status of
 # Viewing the commit history
 git log --oneline                   # View a one-line log of recent commits
 
+# Delete a file from the working directory and stage the deletion
+git rm <filename>
+
+# Untrack a file (remove from repository, but keep it locally)
+git rm --cached <filename>
+
+# Commit the removal or untracking
+git commit -m "Remove <filename> from the repository"  # For deletion
+git commit -m "Stop tracking <filename>"               # For untracking
+
+# Push the changes to the remote repository
+git push origin <branch-name>
