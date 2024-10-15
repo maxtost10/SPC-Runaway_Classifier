@@ -1,0 +1,5 @@
+# Ignore data files
+Data/DB_TCV_DISR.json
+Data/TCV_DATAno63847.parquet
+Data/TCVno63847.h5
+Data/flattened_DB_TCV_DISR.json
