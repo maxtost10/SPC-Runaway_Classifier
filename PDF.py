@@ -73,13 +73,13 @@ def PDF(y, plot=False, norm=False):
 
 def Edward(y, t, t_c):
     """
-    Cuts the function values y into corresponding amount of pieces at the given time 
-    points in corresponding time series. Referring to Edward Scissorhands.
+    Cuts the function values y into corresponding pieces at given time points, approximating
+    where necessary based on the closest transition points in the time series. Referring to Edward Scissorhands.
 
     Args:
         y: array length N with function values
         t: array length N with timestamps
-        t_c: array length < N with points where y should be cut
+        t_c: array length < N with points where y should be cut (can include values not in t)
         
     Returns:
         y_c: array of length len(t_c)+1 containing the cut y data
@@ -87,20 +87,29 @@ def Edward(y, t, t_c):
     Example:
         y = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3]
         t = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        t_c = [3, 7]
+        t_c = [3, 7.5]
         Edward(y, t, t_c)
-        >>> [[1, 1, 1], [2, 2, 2, 2], [3, 3, 3]]
+        >>> [[1, 1, 1], [2, 2, 2, 2, 3], [3, 3]]
     """
     
     # Initialize the list to store the cut pieces
     y_c = []
     
+    # Convert t and t_c to NumPy arrays for easy distance computation
+    t_array = np.array(t)
+    t_c_array = np.array(t_c)
+    
     # Add the first segment from the start up to the first cut point
     start_idx = 0
-    for cut_point in t_c:
-        end_idx = t.index(cut_point)  # Find the index of the cut point in the time series
-        y_c.append(y[start_idx:end_idx + 1])  # Append the segment to the list
-        start_idx = end_idx + 1  # Update the start index for the next segment
+    for cut_point in t_c_array:
+        # Find the index of the closest value in t to the cut point
+        closest_idx = (np.abs(t_array - cut_point)).argmin()
+        
+        # Append the segment to the list
+        y_c.append(y[start_idx:closest_idx + 1])
+        
+        # Update the start index for the next segment
+        start_idx = closest_idx + 1
     
     # Add the final segment after the last cut point
     y_c.append(y[start_idx:])
