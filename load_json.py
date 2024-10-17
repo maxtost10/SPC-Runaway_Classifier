@@ -44,7 +44,7 @@ def load_json(path, print_ = False):
         disruption_data = json.load(json_file)
         
     if print_ == True:
-        print('The structure of the json file is\n'
+        print('The structure of the json file is\n')
         print_dict_structure(disruption_data, max_layers=-1, indent=0)
 
 
