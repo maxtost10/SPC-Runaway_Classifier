@@ -71,6 +71,8 @@ def PDF(y, plot=False, norm=False):
     return (hist, bin_centers), scaling
 
 
+import numpy as np
+
 def Edward(y, t, t_c):
     """
     Cuts the function values y into corresponding pieces at given time points, approximating
@@ -82,36 +84,61 @@ def Edward(y, t, t_c):
         t_c: array length < N with points where y should be cut (can include values not in t)
         
     Returns:
-        y_c: array of length len(t_c)+1 containing the cut y data
+        y_cutted: array of length len(t_c)+1 containing the cut y data
+        t_cutted: array of length len(t_c)+1 containing the cut t data
         
     Example:
         y = [1, 1, 1, 2, 2, 2, 2, 3, 3, 3]
         t = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         t_c = [3, 7.5]
         Edward(y, t, t_c)
-        >>> [[1, 1, 1], [2, 2, 2, 2, 3], [3, 3]]
+        >>> [[1, 1, 1], [2, 2, 2, 2, 3], [3, 3]], [[1, 2, 3], [4, 5, 6, 7, 8], [9, 10]]
     """
     
-    # Initialize the list to store the cut pieces
-    y_c = []
-    
-    # Convert t and t_c to NumPy arrays for easy distance computation
-    t_array = np.array(t)
+    # Ensure inputs are numpy arrays
+    t_array = t.to_numpy()
+    y = y.to_numpy()
     t_c_array = np.array(t_c)
+
+    # Initialize the lists for storing cut segments
+    y_cutted = []
+    t_cutted = []
     
-    # Add the first segment from the start up to the first cut point
+    # Initial index to start slicing from
     start_idx = 0
+    
     for cut_point in t_c_array:
+        # Check if cut_point is outside the range of t
+        if cut_point < t_array[0] or cut_point > t_array[-1]:
+            raise ValueError(f"Cut point {cut_point} is out of bounds for t.")
+        
         # Find the index of the closest value in t to the cut point
         closest_idx = (np.abs(t_array - cut_point)).argmin()
         
-        # Append the segment to the list
-        y_c.append(y[start_idx:closest_idx + 1])
+        # Append the segment up to the closest index
+        y_cutted.append(y[start_idx:closest_idx + 1])
+        t_cutted.append(t[start_idx:closest_idx + 1])
         
-        # Update the start index for the next segment
+        # Update the start index
         start_idx = closest_idx + 1
     
     # Add the final segment after the last cut point
-    y_c.append(y[start_idx:])
+    y_cutted.append(y[start_idx:])
+    t_cutted.append(t[start_idx:])
     
-    return y_c
+    return y_cutted, t_cutted
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
