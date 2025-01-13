@@ -53,5 +53,7 @@ git push origin <branch-name>
 # Conect to lac 
 ssh -X tost@lac8
 
-
+# find /path/ -type f: Lists all files in the specified directory.
+# awk -F. '{if (NF>1) print $NF}': Extracts the file extension.
+# sort | uniq -c: Sorts the extensions and counts occurrences.
 find /Lac8_D/DEFUSE/DEFUSE_DB/DB_mat/ -type f | awk -F. '{if (NF>1) print $NF}' | sort | uniq -c
