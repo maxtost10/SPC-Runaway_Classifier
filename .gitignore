@@ -7,3 +7,4 @@ UV_Notebook.bat
 PasswordLac.py
 *.png
 __pycache__
+*.mat
