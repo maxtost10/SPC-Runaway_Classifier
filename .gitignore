@@ -8,3 +8,4 @@ PasswordLac.py
 *.png
 __pycache__
 *.mat
+matlab_env
