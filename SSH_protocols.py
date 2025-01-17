@@ -10,7 +10,8 @@ hostname = "lac8"
 port = 22
 username = "tost"
 password = pw()
-def load_mat_file(file_name, local_path):
+
+def load_mat_file(file_name, local_path, delete=True):
     """
     Downloads a .mat file from a remote server using SFTP, loads its contents, 
     and removes the local copy after loading to save storage.
@@ -64,10 +65,10 @@ def load_mat_file(file_name, local_path):
                 # Skip internal MATLAB metadata keys (e.g., '__header__', '__version__')
                 if not key.startswith("__"):
                     print(f"{key}: {type(value)}, Shape: {value.shape if hasattr(value, 'shape') else 'N/A'}")
-            
-            # Remove the downloaded file to save disk space
-            print(f"Deleting {local_file_path}. Variable remains.")
-            os.remove(local_file_path)
+            if delete:
+                # Remove the downloaded file to save disk space
+                print(f"Deleting {local_file_path}. Variable remains.")
+                os.remove(local_file_path)
 
         except FileNotFoundError:
             # Handle the case where the file doesn't exist on the server
