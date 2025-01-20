@@ -1,5 +1,5 @@
 import os
-from scipy.io import loadmat
+import h5py
 import pickle
 import numpy as np
 
@@ -17,28 +17,27 @@ def convert_to_standard_format(data):
     else:
         return data
 
-def process_mat_file(file_path):
+def process_h5_file(file_path):
     """
-    Processes a .mat file and extracts the necessary data.
+    Processes a .h5 file and extracts the necessary data.
 
     Parameters:
-        file_path (str): The path to the .mat file.
+        file_path (str): The path to the .h5 file.
 
     Returns:
         dict: The processed data.
     """
-    mat_contents = loadmat(file_path)
     processed_data = {}
 
-    # Extract the necessary data from the .mat file
-    keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7']
-    for key in keys_jet:
-        if key in mat_contents['SIG'].dtype.names:
-            signal_data = mat_contents['SIG'][key][0][0]
-            processed_data[key] = {
-                'signal': convert_to_standard_format(signal_data['signal']),
-                'time': convert_to_standard_format(signal_data['time'])
-            }
+    with h5py.File(file_path, 'r') as h5_file:
+        keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7']
+        for key in keys_jet:
+            if key in h5_file['SIG']:
+                signal_data = h5_file['SIG'][key]
+                processed_data[key] = {
+                    'signal': convert_to_standard_format(signal_data['signal'][:]),
+                    'time': convert_to_standard_format(signal_data['time'][:])
+                }
 
     return processed_data
 
@@ -56,16 +55,30 @@ def save_to_pickle(data, file_name):
 
 def main():
     remote_path = "/Lac8_D/DEFUSE/DEFUSE_DB/DB_mat/"
-    file_name = "JETno81543.mat"  # Example file name
-    file_path = os.path.join(remote_path, file_name)
+    
+    # List all files in the remote directory
+    remote_files = os.listdir(remote_path)
 
-    print("Processing file: {}".format(file_path))
-    processed_data = process_mat_file(file_path)
+    # Filter files to include only JET .h5 files
+    jet_h5_files = [file for file in remote_files if 'JET' in file and file.endswith('.h5')]
 
-    # Save the processed data to a Pickle file
-    pickle_file_name = "{}.pkl".format(file_name)
-    save_to_pickle(processed_data, pickle_file_name)
-    print("Pickle file created: {}".format(pickle_file_name))
+    # Process only the first 10 JET .h5 files
+    jet_h5_files = jet_h5_files[:10]
+
+    all_data = {}
+
+    for file_name in jet_h5_files:
+        file_path = os.path.join(remote_path, file_name)
+        print("Processing file: {}".format(file_path))
+        shot_number = file_name.split('.')[0]  # Extract shot number from file name
+
+        processed_data = process_h5_file(file_path)
+        all_data[shot_number] = processed_data
+
+    # Save the aggregated data to a single Pickle file
+    pickle_file_name = "all_JET_h5_data_first_10.pkl"
+    save_to_pickle(all_data, pickle_file_name)
+    print("Aggregated Pickle file created: {}".format(pickle_file_name))
 
 if __name__ == "__main__":
     main()
