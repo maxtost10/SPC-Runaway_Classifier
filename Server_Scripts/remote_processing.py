@@ -35,8 +35,8 @@ def process_h5_file(file_path):
             if key in h5_file['SIG']:
                 signal_data = h5_file['SIG'][key]
                 processed_data[key] = {
-                    'signal': convert_to_standard_format(signal_data['signal'][:]),
-                    'time': convert_to_standard_format(signal_data['time'][:])
+                    'signal': convert_to_standard_format(signal_data['signal'][:]).flatten(),
+                    'time': convert_to_standard_format(signal_data['time'][:]).flatten()
                 }
 
     return processed_data
