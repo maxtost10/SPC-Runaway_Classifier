@@ -88,6 +88,9 @@ def main():
     # Filter files to include only JET .mat and .h5 files
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
 
+    # Only first 10 files are processed for demonstration purposes
+    # jet_files = jet_files[:10]
+
     all_data = {}
 
     for file_name in jet_files:
