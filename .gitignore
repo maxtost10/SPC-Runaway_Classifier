@@ -10,5 +10,4 @@ __pycache__
 *.mat
 matlab_env
 Archive
-all_JET_data_first_10.pkl
-JETno81543.mat.pkl
+*.pkl
