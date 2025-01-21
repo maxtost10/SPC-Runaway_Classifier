@@ -1,7 +1,7 @@
-import paramiko
+import paramiko # To establish an SSH connection
 import sys
 import os
-import pickle
+import pickle # To store the processed data
 import matplotlib.pyplot as plt
 sys.path.append(r'C:\Users\Max Tost\Desktop\Notebooks\SPC Neural Network Project')
 
@@ -87,6 +87,7 @@ def execute_remote_script_download(script_path, remote_script_path, result_file)
         local_result_path = os.path.join(os.path.dirname(script_path), result_file)
         remote_result_path = os.path.join(os.path.dirname(remote_script_path), result_file).replace('\\', '/')
         print("Attempting to download {} to {}".format(remote_result_path, local_result_path))
+        print("File size: {} MB".format(sftp.stat(remote_result_path).st_size/1e6))
         sftp.get(remote_result_path, local_result_path)
         print("Downloaded {} to {}".format(remote_result_path, local_result_path))
 
@@ -139,3 +140,35 @@ def plot_data(data, key):
     plt.ylabel("Signal")
     plt.grid(True)
     plt.show()
+
+def download_existing_pickle(remote_file_path, local_file_path):
+    """
+    Downloads an existing Pickle file from the remote server to the local machine.
+
+    Parameters:
+        remote_file_path (str): The path to the Pickle file on the remote server.
+        local_file_path (str): The path to save the Pickle file on the local machine.
+    """
+    try:
+        # Initialize an SSH client
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # Accept unknown host keys
+        ssh_client.connect(hostname, port, username, password)  # Connect to the remote server
+        
+        # Open an SFTP session
+        sftp = ssh_client.open_sftp()
+        print("SFTP session established!")
+
+        # Download the Pickle file
+        print("Attempting to download {} to {}".format(remote_file_path, local_file_path))
+        sftp.get(remote_file_path, local_file_path)
+        print("Downloaded {} to {}".format(remote_file_path, local_file_path))
+
+        # Close the SFTP session
+        sftp.close()
+        ssh_client.close()
+        print("SFTP session closed.")
+    
+    except Exception as e:
+        # Handle any unexpected errors
+        print("An error occurred: {}".format(e))
