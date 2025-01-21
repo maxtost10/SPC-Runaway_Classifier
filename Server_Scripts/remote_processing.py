@@ -121,7 +121,7 @@ def main():
     # Filter files to include only JET .mat and .h5 files
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
 
-    jet_files = jet_files[:20]  # Limit the number of files to process for testing
+    # jet_files = jet_files[:20]  # Limit the number of files to process for testing
 
     for file_name in jet_files:
         shot_number = file_name.split('.')[0]  # Extract shot number from file name
