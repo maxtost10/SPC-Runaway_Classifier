@@ -36,10 +36,13 @@ def process_mat_file(file_path):
     for key in keys_jet:
         if key in mat_contents['SIG'].dtype.names:
             signal_data = mat_contents['SIG'][key][0][0]
-            processed_data[key] = {
-                'signal': convert_to_standard_format(signal_data['signal']).flatten(),
-                'time': convert_to_standard_format(signal_data['time']).flatten()
-            }
+            for field_name in signal_data.dtype.names:
+                if field_name == 'signal':
+                    processed_data[key] = {
+                        'signal': convert_to_standard_format(signal_data['signal']).flatten()
+                    }
+                else:
+                    processed_data[key]['time'] = convert_to_standard_format(signal_data[field_name]).flatten()
 
     return processed_data
 
@@ -87,9 +90,6 @@ def main():
 
     # Filter files to include only JET .mat and .h5 files
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
-
-    # Only first 10 files are processed for demonstration purposes
-    # jet_files = jet_files[:10]
 
     all_data = {}
 
