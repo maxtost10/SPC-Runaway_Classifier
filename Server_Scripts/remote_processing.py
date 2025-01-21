@@ -40,8 +40,7 @@ def process_mat_file(file_path):
             if key in mat_contents['SIG'].dtype.names:
                 signal_data = mat_contents['SIG'][key][0][0]
                 processed_data[key] = {
-                    'signal': convert_to_standard_format(signal_data['signal']).flatten(),
-                    'time': convert_to_standard_format(signal_data['time']).flatten()
+                    'signal': convert_to_standard_format(signal_data['signal']).flatten()
                 }
 
         return processed_data
@@ -68,8 +67,7 @@ def process_h5_file(file_path):
             if key in h5_file['SIG']:
                 signal_data = h5_file['SIG'][key]
                 processed_data[key] = {
-                    'signal': convert_to_standard_format(signal_data['signal'][:]).flatten(),
-                    'time': convert_to_standard_format(signal_data['time'][:]).flatten()
+                    'signal': convert_to_standard_format(signal_data['signal'][:]).flatten()
                 }
 
     return processed_data
