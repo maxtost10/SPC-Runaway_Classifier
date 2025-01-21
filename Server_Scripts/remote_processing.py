@@ -39,13 +39,10 @@ def process_mat_file(file_path):
         for key in keys_jet:
             if key in mat_contents['SIG'].dtype.names:
                 signal_data = mat_contents['SIG'][key][0][0]
-                for field_name in signal_data.dtype.names:
-                    if field_name == 'signal':
-                        processed_data[key] = {
-                            'signal': convert_to_standard_format(signal_data['signal']).flatten()
-                        }
-                    else:
-                        processed_data[key]['time'] = convert_to_standard_format(signal_data[field_name]).flatten()
+                processed_data[key] = {
+                    'signal': convert_to_standard_format(signal_data['signal']).flatten(),
+                    'time': convert_to_standard_format(signal_data['time']).flatten()
+                }
 
         return processed_data
 
