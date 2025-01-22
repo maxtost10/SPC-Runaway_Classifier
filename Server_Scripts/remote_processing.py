@@ -62,7 +62,7 @@ def process_mat_file(file_path):
                 if key in mat_contents['Discharge'].dtype.names:
                     processed_data[key] = convert_to_standard_format(mat_contents['Discharge'][key][0][0])
                 else:
-                    print(f"Key {key} not found in mat_contents['Discharge']")
+                    print("Key {} not found in h5_file['Discharge']".format(key))
 
         return processed_data
 
@@ -109,7 +109,7 @@ def process_h5_file(file_path):
                 if key in h5_file['Discharge']:
                     processed_data[key] = convert_to_standard_format(h5_file['Discharge'][key][:])
                 else:
-                    print(f"Key {key} not found in h5_file['Discharge']")
+                    print("Key {} not found in h5_file['Discharge']".format(key))
 
     return processed_data
 
