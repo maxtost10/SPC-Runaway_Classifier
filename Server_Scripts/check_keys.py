@@ -1,6 +1,7 @@
 import os
 from scipy.io import loadmat
 import h5py
+import random
 
 def check_keys_in_mat_file(file_path, missing_keys_count):
     """
@@ -44,7 +45,8 @@ def main():
     remote_files = os.listdir(remote_path)
 
     # Filter files to include only JET .mat and .h5 files
-    jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
+    jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))][:200] # Only process 200 files because it takes too long otherwise
+    random.shuffle(jet_files) # Shuffling the list to get a statistical value
 
     # Initialize missing keys count
     keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7', 'SSX', 'SSX_core', 'DAO_EDG7', 'SSXcore']
