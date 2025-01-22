@@ -15,9 +15,9 @@ def check_keys_in_mat_file(file_path, missing_keys_count):
         mat_contents = loadmat(file_path)
 
         # Check for the presence of keys in the .mat file
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7', 'SSX', 'SSX_core', 'DAO_EDG7', 'SSXcore']
+        keys_jet = ['disr_ipla_td']
         for key in keys_jet:
-            if key not in mat_contents['SIG'].dtype.names:
+            if key not in mat_contents['objDIS'].dtype.names:
                 missing_keys_count[key] += 1
 
     except NotImplementedError:
@@ -33,9 +33,9 @@ def check_keys_in_h5_file(file_path, missing_keys_count):
         missing_keys_count (dict): Dictionary to count missing keys.
     """
     with h5py.File(file_path, 'r') as h5_file:
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7', 'SSX', 'SSX_core', 'DAO_EDG7', 'SSXcore']
+        keys_jet = ['disr_ipla_td']
         for key in keys_jet:
-            if key not in h5_file['SIG']:
+            if key not in h5_file['objDIS']:
                 missing_keys_count[key] += 1
 
 def main():
@@ -49,7 +49,7 @@ def main():
     random.shuffle(jet_files) # Shuffling the list to get a statistical value
 
     # Initialize missing keys count
-    keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7', 'SSX', 'SSX_core', 'DAO_EDG7', 'SSXcore']
+    keys_jet = ['disr_ipla_td']
     missing_keys_count = {key: 0 for key in keys_jet}
 
     for file_name in jet_files:
