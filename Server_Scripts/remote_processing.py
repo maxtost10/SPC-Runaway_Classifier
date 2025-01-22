@@ -52,17 +52,22 @@ def process_mat_file(file_path):
         # Check for the presence of additional keys in the .mat file
         if 'objDIS' in mat_contents:
             if 'disr_ipla_td' in mat_contents['objDIS'].dtype.names:
-                processed_data['disr_ipla_td'] = convert_to_standard_format(mat_contents['objDIS']['disr_ipla_td'][0][0])
+                processed_data['disr_ipla_td'] = mat_contents['objDIS']['disr_ipla_td'][0][0][0][1]
             else:
-                print(f"Key 'disr_ipla_td' not found in mat_contents['objDIS']")
+                print("Key 'disr_ipla_td' not found in mat_contents['objDIS']")
 
         if 'Discharge' in mat_contents:
             additional_keys = ['Ramp_up', 'Flat_top', 'Ramp_down']
             for key in additional_keys:
-                if key in mat_contents['Discharge'].dtype.names:
-                    processed_data[key] = convert_to_standard_format(mat_contents['Discharge'][key][0][0])
-                else:
-                    print("Key {} not found in h5_file['Discharge']".format(key))
+                try:
+                    # Attempt to access and process the data
+                    if key in mat_contents['Discharge'].dtype.names:
+                        processed_data[key] = convert_to_standard_format(mat_contents['Discharge'][key][0][0][0])
+                    else:
+                        print("Key {} not found in mat_contents['Discharge']".format(key))
+                except (IndexError, KeyError, AttributeError) as e:
+                    # Handle cases where the key or indices are not accessible
+                    print("Could not process key {}: {}".format(key, e))
 
         return processed_data
 
@@ -99,17 +104,17 @@ def process_h5_file(file_path):
         # Check for the presence of additional keys in the .h5 file
         if 'objDIS' in h5_file:
             if 'disr_ipla_td' in h5_file['objDIS']:
-                processed_data['disr_ipla_td'] = convert_to_standard_format(h5_file['objDIS']['disr_ipla_td'][:])
-            else:
-                print(f"Key 'disr_ipla_td' not found in h5_file['objDIS']")
+                processed_data['disr_ipla_td'] = h5_file['objDIS']['disr_ipla_td'][:][1][0]
+            
+                additional_keys = ['Ramp_up', 'Flat_top', 'Ramp_down']
+                for key in additional_keys:
+                    if key in h5_file['objDIS']['Discharge']:
+                        processed_data[key] = convert_to_standard_format(h5_file['objDIS']['Discharge'][key][:].flatten())
+                    else:
+                        print("Key {} not found in h5_file['objDIS']['Discharge']".format(key))
 
-        if 'Discharge' in h5_file:
-            additional_keys = ['Ramp_up', 'Flat_top', 'Ramp_down']
-            for key in additional_keys:
-                if key in h5_file['Discharge']:
-                    processed_data[key] = convert_to_standard_format(h5_file['Discharge'][key][:])
-                else:
-                    print("Key {} not found in h5_file['Discharge']".format(key))
+            else:
+                print("Key 'disr_ipla_td' not found in h5_file['objDIS']")
 
     return processed_data
 
@@ -160,8 +165,8 @@ def main():
     # Filter files to include only JET .mat and .h5 files
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
 
-    random.shuffle(jet_files)  # Shuffle the list to get a statistical value
-    jet_files = jet_files[:20]  # Limit the number of files to process for testing
+    # random.shuffle(jet_files)  # Shuffle the list to get a statistical value
+    # jet_files = jet_files[:40]  # Limit the number of files to process for testing
 
     for file_name in jet_files:
         shot_number = file_name.split('.')[0]  # Extract shot number from file name
