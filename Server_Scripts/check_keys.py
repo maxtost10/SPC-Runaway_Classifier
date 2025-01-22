@@ -17,7 +17,7 @@ def check_keys_in_mat_file(file_path, missing_keys_count):
         # Check for the presence of keys in the .mat file
         keys_jet = ['disr_ipla_td']
         for key in keys_jet:
-            if key not in mat_contents['objDIS'].dtype.names:
+            if key not in mat_contents['Ramp_up', 'Flat_top', 'Ramp_down'].dtype.names:
                 missing_keys_count[key] += 1
 
     except NotImplementedError:
@@ -35,7 +35,7 @@ def check_keys_in_h5_file(file_path, missing_keys_count):
     with h5py.File(file_path, 'r') as h5_file:
         keys_jet = ['disr_ipla_td']
         for key in keys_jet:
-            if key not in h5_file['objDIS']:
+            if key not in h5_file['Ramp_up', 'Flat_top', 'Ramp_down']:
                 missing_keys_count[key] += 1
 
 def main():
