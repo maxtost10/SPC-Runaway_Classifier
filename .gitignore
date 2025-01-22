@@ -11,3 +11,4 @@ __pycache__
 matlab_env
 Archive
 *.pkl
+*.h5
