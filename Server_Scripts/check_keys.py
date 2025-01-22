@@ -60,6 +60,7 @@ def main():
             check_keys_in_h5_file(file_path, missing_keys_count)
 
     print("Missing keys count: {}".format(missing_keys_count))
+    print("Total files processed: {}".format(len(jet_files)))
 
 if __name__ == "__main__":
     main()
