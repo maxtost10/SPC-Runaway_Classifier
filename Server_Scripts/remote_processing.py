@@ -35,12 +35,17 @@ def process_mat_file(file_path):
         processed_data = {}
 
         # Extract the necessary data from the .mat file
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7']
+        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore']
         for key in keys_jet:
             if key in mat_contents['SIG'].dtype.names:
                 signal_data = mat_contents['SIG'][key][0][0]
+                if 'time' in signal_data.dtype.names:
+                    time_data = signal_data['time']
+                else:
+                    time_data = mat_contents['SIG']['time'][0][0]
                 processed_data[key] = {
-                    'signal': convert_to_standard_format(signal_data['signal']).flatten()
+                    'signal': convert_to_standard_format(signal_data['signal']).flatten(),
+                    'time': convert_to_standard_format(time_data).flatten()
                 }
 
         return processed_data
@@ -62,12 +67,17 @@ def process_h5_file(file_path):
     processed_data = {}
 
     with h5py.File(file_path, 'r') as h5_file:
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAI_EDG7']
+        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore']
         for key in keys_jet:
             if key in h5_file['SIG']:
                 signal_data = h5_file['SIG'][key]
+                if 'time' in signal_data:
+                    time_data = signal_data['time'][:]
+                else:
+                    time_data = h5_file['SIG']['time'][:]
                 processed_data[key] = {
-                    'signal': convert_to_standard_format(signal_data['signal'][:]).flatten()
+                    'signal': convert_to_standard_format(signal_data['signal'][:]).flatten(),
+                    'time': convert_to_standard_format(time_data).flatten()
                 }
 
     return processed_data
