@@ -22,7 +22,7 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, leng
     
     return downsampled_time, downsampled_signal
 
-def downsample_and_merge(t_b, t_e, shot, length, keys= ['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT']):
+def downsample_and_merge(shot, length=1000, keys= ['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT']):
 
     # Extract the time range for the shot
     t_b, t_e = shot['Ramp_up'][0], shot['Ramp_down'][1]
