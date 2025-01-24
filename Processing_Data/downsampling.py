@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def downsample_timeseries(begin_time, end_time, time_series, signal_series, length):
+def downsample_timeseries(begin_time, end_time, time_series, signal_series, length=1000):
     # Create a DataFrame from the time and signal series
     df = pd.DataFrame({'time': time_series, 'signal': signal_series})
     
@@ -23,6 +23,9 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, leng
     return downsampled_time, downsampled_signal
 
 def downsample_and_merge(t_b, t_e, shot, length, keys= ['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT']):
+
+    # Extract the time range for the shot
+    t_b, t_e = shot['Ramp_up'][0], shot['Ramp_down'][1]
     # Initialize an empty DataFrame for the merged result
     merged_df = pd.DataFrame()
     
