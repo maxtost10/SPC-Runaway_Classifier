@@ -13,7 +13,7 @@ def convert_to_standard_format(data):
     Recursively convert nested arrays with dtype=object to standard NumPy arrays or lists,
     and flatten them.
     """
-    if isinstance(data, np.ndarray) and data.dtype == np.object:
+    if isinstance(data, np.ndarray) and data.dtype == object:
         return np.array([convert_to_standard_format(item) for item in data]).flatten()
     elif isinstance(data, (list, tuple)):
         return [convert_to_standard_format(item) for item in data]
@@ -105,7 +105,7 @@ def process_h5_file(file_path):
             additional_keys = ['Ramp_up', 'Flat_top', 'Ramp_down']
             for key in additional_keys:
                 if key in h5_file['objDIS']['Discharge']:
-                    processed_data[key] = convert_to_standard_format(h5_file['objDIS']['Discharge'][key][:].flatten())
+                    processed_data[key] = h5_file['objDIS']['Discharge'][key][:].flatten()
                 else:
                     print("Key {} not found in h5_file['objDIS']['Discharge']".format(key))
 
@@ -113,14 +113,24 @@ def process_h5_file(file_path):
 
 def downsample_timeseries(begin_time, end_time, time_series, signal_series, length=1000):
     """
-    Downsample a timeseries within a specified time range.
+    Downsample a timeseries using interpolation within a specified time range.
     """
-    df = pd.DataFrame({'time': time_series, 'signal': signal_series})
-    df = df[(df['time'] >= begin_time) & (df['time'] <= end_time)]
+    # Filter time and signal within the specified range
+    mask = (time_series >= begin_time) & (time_series <= end_time)
+    time_series = time_series[mask]
+    signal_series = signal_series[mask]
+
+    # Handle case where no data points are in range
+    if len(time_series) == 0:
+        print("Warning: No data points in the specified time range.")
+        return np.linspace(begin_time, end_time, length), np.zeros(length)
+
+    # Create the downsampled time points
     downsampled_time = np.linspace(begin_time, end_time, length)
-    bins = np.linspace(begin_time, end_time, length + 1)
-    df['bin'] = pd.cut(df['time'], bins, labels=False, include_lowest=True)
-    downsampled_signal = df.groupby('bin')['signal'].mean().values
+
+    # Interpolate the signal at the downsampled time points
+    downsampled_signal = np.interp(downsampled_time, time_series, signal_series)
+
     return downsampled_time, downsampled_signal
 
 def downsample_and_merge(shot, length=1000, keys=['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT']):
@@ -169,7 +179,7 @@ def process_and_save_as_csv(file_path, output_folder, length=1000):
     try:
         merged_df = downsample_and_merge(shot_data, length=length)
         merged_df.to_csv(output_file, index=False)
-        print("Saved downsampled data to {}".format(output_file))
+        print("Saved downsampled data of file {} to {}".format(file_path, output_file))
     except Exception as e:
         print("Failed to process {}: {}".format(file_path, e))
 
@@ -182,9 +192,9 @@ def main():
         os.makedirs(output_folder)
 
     remote_files = os.listdir(remote_path)
-    jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
-    random.shuffle(jet_files)  # Shuffle the list to get a statistical value
-    jet_files = jet_files[:2]  # Limit the number of files to process for testing
+    jet_files = [file for file in remote_files if 'JET' in file and file.endswith('.h5')]# (file.endswith('.mat') or file.endswith('.h5'))]
+    # random.shuffle(jet_files)  # Shuffle the list to get a statistical value
+    # jet_files = jet_files[:10]  # Limit the number of files to process for testing
 
     for file_name in jet_files:
         file_path = os.path.join(remote_path, file_name)
