@@ -156,7 +156,7 @@ def main():
     pickle_file_name = "all_JET_data.pkl"
     
     # Load existing data if it exists
-    all_data = load_existing_data(pickle_file_name)
+    all_data = load_existing_data(os.path.join('/home/tost/NoTivoli/'+ pickle_file_name))
     processed_shots = set(all_data.keys())
 
     # List all files in the remote directory
@@ -185,7 +185,7 @@ def main():
         all_data[shot_number] = processed_data
 
         # Save the aggregated data to a single Pickle file after each file is processed
-        save_to_pickle(all_data, pickle_file_name)
+        save_to_pickle(all_data, os.path.join('/home/tost/NoTivoli/'+ pickle_file_name))
 
     print("Aggregated Pickle file created: {}".format(pickle_file_name))
 
