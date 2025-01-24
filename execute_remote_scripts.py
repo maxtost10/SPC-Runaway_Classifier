@@ -3,6 +3,7 @@ import sys
 import os
 import pickle # To store the processed data
 import matplotlib.pyplot as plt
+import shutil
 sys.path.append(r'C:\Users\Max Tost\Desktop\Notebooks\SPC Neural Network Project')
 
 from PasswordLac import password as pw
@@ -50,19 +51,19 @@ def execute_remote_script(script_path, remote_script_path):
 
 
 
-def execute_remote_script_download(script_path, remote_script_path, result_file):
+def execute_remote_script_download(script_path, remote_script_path, remote_folder, local_folder):
     """
-    Executes a Python script on the remote server and retrieves the result file.
+    Executes a Python script on the remote server and retrieves the contents of a folder.
 
     Parameters:
         script_path (str): The local path to the Python script to be executed.
         remote_script_path (str): The remote path where the script will be uploaded.
-        result_file (str): The name of the result file to be retrieved.
+        remote_folder (str): The remote folder to be downloaded.
+        local_folder (str): The local folder where the contents will be saved.
 
     Returns:
-        dict: The contents of the result file as a Python dictionary, or None if an error occurs.
+        bool: True if the operation was successful, False otherwise.
     """
-    result_data = None
 
     try:
         # Initialize an SSH client
@@ -83,17 +84,20 @@ def execute_remote_script_download(script_path, remote_script_path, result_file)
         print(stdout.read().decode())
         print(stderr.read().decode())
 
-        # Download the result file
-        local_result_path = os.path.join(os.path.dirname(script_path), result_file)
-        remote_result_path = os.path.join(os.path.dirname(remote_script_path), result_file).replace('\\', '/')
-        print("Attempting to download {} to {}".format(remote_result_path, local_result_path))
-        print("File size: {} MB".format(sftp.stat(remote_result_path).st_size/1e6))
-        sftp.get(remote_result_path, local_result_path)
-        print("Downloaded {} to {}".format(remote_result_path, local_result_path))
+        # Ensure the local folder exists
+        if not os.path.exists(local_folder):
+            os.makedirs(local_folder)
 
-        # Load the result data
-        with open(local_result_path, 'rb') as pickle_file:
-            result_data = pickle.load(pickle_file, encoding='latin1')
+        # Download the contents of the remote folder
+        print(f"Downloading contents of remote folder {remote_folder} to local folder {local_folder}")
+        for file_attr in sftp.listdir_attr(remote_folder):
+            remote_file_path = os.path.join(remote_folder, file_attr.filename).replace('\\', '/')
+            local_file_path = os.path.join(local_folder, file_attr.filename)
+
+            print(f"Downloading {remote_file_path} to {local_file_path}")
+            sftp.get(remote_file_path, local_file_path)
+
+        print(f"Downloaded all files from {remote_folder} to {local_folder}")
 
         # Close the SFTP session
         sftp.close()
@@ -103,8 +107,6 @@ def execute_remote_script_download(script_path, remote_script_path, result_file)
     except Exception as e:
         # Handle any unexpected errors
         print("An error occurred: {}".format(e))
-
-    return result_data
 
 
 
