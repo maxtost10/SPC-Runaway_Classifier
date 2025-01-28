@@ -192,7 +192,7 @@ def main():
         os.makedirs(output_folder)
 
     remote_files = os.listdir(remote_path)
-    jet_files = [file for file in remote_files if 'JET' in file and file.endswith('.h5')]# (file.endswith('.mat') or file.endswith('.h5'))]
+    jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
     # random.shuffle(jet_files)  # Shuffle the list to get a statistical value
     # jet_files = jet_files[:10]  # Limit the number of files to process for testing
 
