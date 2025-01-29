@@ -37,7 +37,7 @@ def process_mat_file(file_path):
         processed_data = {}
 
         # Extract the necessary data from the .mat file
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore']
+        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7']
         for key in keys_jet:
             if key in mat_contents['SIG'].dtype.names:
                 signal_data = mat_contents['SIG'][key][0][0]
@@ -86,7 +86,7 @@ def process_h5_file(file_path):
     processed_data = {}
 
     with h5py.File(file_path, 'r') as h5_file:
-        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore']
+        keys_jet = ['IP', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7']
         for key in keys_jet:
             if key in h5_file['SIG']:
                 signal_data = h5_file['SIG'][key]
@@ -133,7 +133,7 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, leng
 
     return downsampled_time, downsampled_signal
 
-def downsample_and_merge(shot, length=1000, keys=['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT']):
+def downsample_and_merge(shot, length=1000, keys=['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT', 'DAI_EDG7']):
     """
     Downsample and merge time-series data for a single shot.
     """
@@ -194,7 +194,7 @@ def main():
     remote_files = os.listdir(remote_path)
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
     # random.shuffle(jet_files)  # Shuffle the list to get a statistical value
-    # jet_files = jet_files[:10]  # Limit the number of files to process for testing
+    # jet_files = jet_files[:100]  # Limit the number of files to process for testing
 
     for file_name in jet_files:
         file_path = os.path.join(remote_path, file_name)
