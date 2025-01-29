@@ -2,12 +2,13 @@ import numpy as np
 from scipy.stats import gaussian_kde
 import pandas as pd
 import numpy as np
+from scipy.integrate import simps  # For numerical integration
 
 def compute_feature_statistics(dataframes, RE_valid, features):
     """
     Computes the minimum and maximum values (extrema) for each feature across multiple DataFrames.
     Additionally, estimates the probability density function (PDF) using Kernel Density Estimation (KDE) 
-    and computes an averaged density estimate.
+    and normalizes each density function before averaging.
 
     Parameters:
     - dataframes (dict): A dictionary where keys are identifiers and values are pandas DataFrames.
@@ -17,7 +18,7 @@ def compute_feature_statistics(dataframes, RE_valid, features):
     Returns:
     - features_extrema (dict): A dictionary containing the min and max values for each feature.
     - features_densities (dict): A dictionary where each feature maps to an array of x-values (range)
-      and an averaged density function computed from the available data.
+      and an averaged, normalized density function computed from the available data.
 
     Notes:
     - If an error occurs while processing a feature in a DataFrame, it is skipped, and an error message is printed.
@@ -62,16 +63,26 @@ def compute_feature_statistics(dataframes, RE_valid, features):
                 # Evaluate the KDE on the generated x-values
                 y = kde(x)
 
-                # Store the density estimate
+                # Normalize the KDE values so that the integral sums to 1
+                integral = simps(y, x)  # Compute numerical integration using Simpson’s rule
+                if integral > 0:  # Avoid division by zero
+                    y /= integral
+
+                # Store the normalized density estimate
                 temp.append(y)
             except Exception as e:
                 print(f"Error processing feature '{feature}' in DataFrame '{RE_key}': {e}")
                 continue  # Skip this DataFrame and proceed to the next one
 
-        # Store the averaged density function over all DataFrames for the feature
-        features_densities[feature] = [x, np.mean(np.array(temp), axis=0)]
+        # Store the averaged, normalized density function over all DataFrames for the feature
+        if temp:  # Ensure temp is not empty before averaging
+            features_densities[feature] = [x, np.mean(np.array(temp), axis=0)]
+        else:
+            print(f"Warning: No valid density estimates for feature '{feature}'")
+            features_densities[feature] = [x, np.zeros_like(x)]  # Default to zero if no data available
 
     return features_extrema, features_densities
+
 
 # Function to check for NaNs and Infs in a dictionary of DataFrames
 def check_nans_infs(dataframes, drop=False):
