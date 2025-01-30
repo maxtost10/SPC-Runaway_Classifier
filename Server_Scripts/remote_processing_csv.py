@@ -111,48 +111,72 @@ def process_h5_file(file_path):
 
     return processed_data
 
-def downsample_timeseries(begin_time, end_time, time_series, signal_series, length=1000):
+def downsample_timeseries(begin_time, end_time, time_series, signal_series, timestep_size=1e-4):
     """
     Downsample a timeseries using interpolation within a specified time range.
+    
+    Parameters:
+    - begin_time: Start time for the downsampling.
+    - end_time: End time for the downsampling.
+    - time_series: Array of time points from the original data.
+    - signal_series: Corresponding signal values.
+    - timestep_size: The desired time step between samples.
+    
+    Returns:
+    - downsampled_time: New time array with fixed time step.
+    - downsampled_signal: Interpolated signal values at the new time points.
     """
+    # Ensure valid input
+    if end_time <= begin_time:
+        raise ValueError("end_time must be greater than begin_time")
+
+    # Create the new time points with fixed timestep
+    downsampled_time = np.arange(begin_time, end_time, timestep_size)
+
     # Filter time and signal within the specified range
     mask = (time_series >= begin_time) & (time_series <= end_time)
-    time_series = time_series[mask]
-    signal_series = signal_series[mask]
+    filtered_time_series = time_series[mask]
+    filtered_signal_series = signal_series[mask]
 
     # Handle case where no data points are in range
-    if len(time_series) == 0:
+    if len(filtered_time_series) == 0:
         print("Warning: No data points in the specified time range.")
-        return np.linspace(begin_time, end_time, length), np.zeros(length)
-
-    # Create the downsampled time points
-    downsampled_time = np.linspace(begin_time, end_time, length)
+        return downsampled_time, np.zeros(len(downsampled_time))
 
     # Interpolate the signal at the downsampled time points
-    downsampled_signal = np.interp(downsampled_time, time_series, signal_series)
+    downsampled_signal = np.interp(downsampled_time, filtered_time_series, filtered_signal_series)
 
     return downsampled_time, downsampled_signal
 
-def downsample_and_merge(shot, length=1000, keys=['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT', 'DAI_EDG7']):
+def downsample_and_merge(shot, file_name, keys=['SSXcore', 'IP', 'DAO_EDG7', 'WMHD', 'RNT', 'DAI_EDG7'], timestep_size=1e-3):
     """
     Downsample and merge time-series data for a single shot.
+    Ensures all signals share the same time grid.
     """
-    t_b, t_e = shot['Ramp_up'][0], shot['Ramp_down'][1]
+    if np.isnan(shot['disr_ipla_td']) or shot['disr_ipla_td'] < shot['Ramp_up'][1]:
+        print('Shot {} can not be processed since the disruption time is not given or too small.'.format(file_name))
+        return pd.DataFrame()
+
+    t_b, t_e = shot['disr_ipla_td'] - 1, shot['IP']['time'][-1]  # Start and end times
     merged_df = pd.DataFrame()
 
+    # Generate a shared time grid
+    shared_time_grid = np.arange(t_b, t_e, timestep_size)
+
     for key in keys:
-        if key not in shot:
+        if key not in shot or len(shot[key]['time']) == 0 or len(shot[key]['signal']) == 0:
+            print('Signal {} from shot {} could not be downsampled since it was not available'.format(key, file_name))
             continue
 
-        if len(shot[key]['time']) == 0 or len(shot[key]['signal']) == 0:
-            downsampled_time = np.linspace(t_b, t_e, length)
-            downsampled_signal = np.zeros(length)
-        else:
-            downsampled_time, downsampled_signal = downsample_timeseries(
-                t_b, t_e, shot[key]['time'], shot[key]['signal'], length
-            )
+        # Downsample using a fixed time grid
+        downsampled_time, downsampled_signal = downsample_timeseries(
+            t_b, t_e, shot[key]['time'], shot[key]['signal'], timestep_size=timestep_size
+        )
 
+        # Create DataFrame with the shared time grid
         downsampled_df = pd.DataFrame({'time': downsampled_time, key: downsampled_signal})
+
+        # Merge on 'time' column
         if merged_df.empty:
             merged_df = downsampled_df
         else:
@@ -160,7 +184,7 @@ def downsample_and_merge(shot, length=1000, keys=['SSXcore', 'IP', 'DAO_EDG7', '
 
     return merged_df
 
-def process_and_save_as_csv(file_path, output_folder, length=1000):
+def process_and_save_as_csv(file_path, output_folder):
     file_name = os.path.splitext(os.path.basename(file_path))[0]
     output_file = os.path.join(output_folder, "{}.csv".format(file_name))
 
@@ -177,7 +201,9 @@ def process_and_save_as_csv(file_path, output_folder, length=1000):
         return
 
     try:
-        merged_df = downsample_and_merge(shot_data, length=length)
+        merged_df = downsample_and_merge(shot_data, file_name)
+        if merged_df.empty:
+            raise ValueError("")
         merged_df.to_csv(output_file, index=False)
         print("Saved downsampled data of file {} to {}".format(file_path, output_file))
     except Exception as e:
