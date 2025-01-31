@@ -14,5 +14,6 @@ Archive
 *.h5
 CSV_Files
 CSV_Files_no_DAI
-CSV_Files_working
 *.svg
+CSV_Files_RE
+CSV_Files_NO_RE
