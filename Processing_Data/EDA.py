@@ -3,6 +3,7 @@ from scipy.stats import gaussian_kde
 import pandas as pd
 import numpy as np
 from scipy.integrate import simps  # For numerical integration
+import matplotlib.pyplot as plt
 
 def compute_feature_statistics(dataframes, RE_valid, features):
     """
@@ -127,3 +128,47 @@ def check_nans_infs(dataframes, drop=False):
         for key in keys_to_drop:
             del dataframes[key]  # Remove the DataFrame from the dictionary
         print(f"Dropped DataFrames: {keys_to_drop}")
+
+
+def plot_jet_data(RE_DICT: pd.DataFrame, NO_RE_DICT: pd.DataFrame, save_path: str, x_lim_re=None, x_lim_no_re=None):
+    """
+    Plots plasma parameters for RE and NO-RE cases from given DataFrames.
+    
+    Parameters:
+    RE_DICT (pd.DataFrame): DataFrame containing runaway electron data with time column.
+    NO_RE_DICT (pd.DataFrame): DataFrame containing non-runaway electron data with time column.
+    save_path (str): File path to save the plot as SVG.
+    x_lim_re (tuple): Limits for x-axis for RE plots (min, max).
+    x_lim_no_re (tuple): Limits for x-axis for NO-RE plots (min, max).
+    """
+    keys_jet = ['IPLA', 'WMHD', 'RNT', 'DAI_EDG7', 'SSXcore'] #, 'DAO_EDG7'
+    units = ['A', 'J', 'Counts', 'p/s/cm²/sr', 'p/s/cm²/sr', 'W/m$^2$']
+    fs = 8
+    
+    fig, axes = plt.subplots(len(keys_jet), 2, figsize=(8, 8))
+    
+    for n, key in enumerate(keys_jet):
+        axes[n, 0].plot(RE_DICT['time'], RE_DICT[key], label='RE')
+        axes[n, 1].plot(NO_RE_DICT['time'], NO_RE_DICT[key], label='NO-RE')
+        
+        # Set x-limits
+        if x_lim_re:
+            axes[n, 0].set_xlim(x_lim_re)
+        if x_lim_no_re:
+            axes[n, 1].set_xlim(x_lim_no_re)
+
+        # Set tick label font size
+        axes[n, 0].tick_params(axis="both", which="major", labelsize=fs)
+        axes[n, 1].tick_params(axis="both", which="major", labelsize=fs)
+        
+        # Set y-label with correct font size
+        axes[n, 0].set_ylabel(f"{key[:3]} [{units[n]}]", fontsize=fs)
+    
+    # Set x-label with correct font size
+    for ax in axes.flat:
+        ax.set_xlabel("time [s]", fontsize=fs)
+    
+    plt.subplots_adjust(hspace=0.7)  # Increase vertical spacing
+    
+    # Save as Vector Graphic (SVG)
+    plt.savefig(save_path, format="svg")
