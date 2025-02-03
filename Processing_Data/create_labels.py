@@ -72,22 +72,17 @@ def save_re_targets(RE_lifetimes, base_path_re, save_path_targets):
         # Load CSV file
         file_path = os.path.join(base_path_re, f'JETno{shot_nr}.csv')
         data = pd.read_csv(file_path)
-        time = data['time'].values  # Convert to NumPy array for efficiency
-
-        # Handle multiple lifetime intervals efficiently
-        if isinstance(lifetimes[0], (list, tuple)):  # Multiple (start, end) pairs
-            lifetime_arr = np.array(lifetimes)  # Convert list of tuples to NumPy array
-            mask = (time[:, None] > lifetime_arr[:, 0]) & (time[:, None] < lifetime_arr[:, 1])
-            target = np.any(mask, axis=1).astype(int)
-        else:  # Single interval case
-            target = ((time > lifetimes[0]) & (time < lifetimes[1])).astype(int)
+        time = data['time']  # Convert to NumPy array for efficiency
+        
+        target = np.zeros(len(time))
 
         # Store target in dictionary
-        targets[shot_nr] = target
+        target[(time>lifetimes[0]) & (time<lifetimes[1])]=1
+        targets[shot_nr] = np.copy(target)
 
         # Save to CSV immediately
-        df = pd.DataFrame({'time': time, 'target': target})
-        df.to_csv(os.path.join(save_path_targets, f"{shot_nr}.csv"), index=False)
+        df = pd.DataFrame({'time': time, 'target': np.copy(target)})
+        df.to_csv(os.path.join(save_path_targets, f"JETno{shot_nr}.csv"), index=False)
 
     return targets
 
@@ -124,6 +119,6 @@ def save_no_re_targets(NO_RE_numbers, base_path, save_path_targets):
 
         # Save to CSV
         df = pd.DataFrame({'time': time, 'target': target})
-        df.to_csv(os.path.join(save_path_targets, f"{shot_nr}.csv"), index=False)
+        df.to_csv(os.path.join(save_path_targets, f"JETno{shot_nr}.csv"), index=False)
 
     return targets
