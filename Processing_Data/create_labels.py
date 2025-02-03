@@ -90,3 +90,40 @@ def save_re_targets(RE_lifetimes, base_path_re, save_path_targets):
         df.to_csv(os.path.join(save_path_targets, f"{shot_nr}.csv"), index=False)
 
     return targets
+
+def save_no_re_targets(NO_RE_numbers, base_path, save_path_targets):
+    '''
+    Creates targets for training in a network later on. All timesteps in the target will be set to 0, because we assume that no re are present in the data.
+
+    Parameters:
+    - NO_RE_numbers (list or array-like): Array with shot numbers of runaway negative shots.
+    - base_path (str): Path to the folder containing the CSV files with the shot parameters.
+    - save_path_targets (str): Path where the targets should be saved as csv.
+
+    Returns:
+    - targets (dict): Dictionary where:
+        - Keys: Shot numbers (same as in NO_RE_numbers).
+        - Values: Array with zeros, the same length as the corresponding time array of the shot
+    '''
+
+    # Ensure save path exists
+    os.makedirs(save_path_targets, exist_ok=True)
+
+    targets = {}
+
+    for shot_nr in NO_RE_numbers:
+        # Load CSV file
+        file_path = os.path.join(base_path, f'JETno{shot_nr}.csv')
+        data = pd.read_csv(file_path)
+        time = data['time'].values  # Convert to NumPy array for efficiency
+
+        target = np.zeros(len(time))
+
+        # Store target in dictionary
+        targets[shot_nr] = target
+
+        # Save to CSV
+        df = pd.DataFrame({'time': time, 'target': target})
+        df.to_csv(os.path.join(save_path_targets, f"{shot_nr}.csv"), index=False)
+
+    return targets
