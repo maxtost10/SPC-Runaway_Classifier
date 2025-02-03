@@ -46,7 +46,7 @@ def load_and_process_data(base_path, re_autom_path, re_valid_path, check_nans_in
     return dataframes, RE_autom, RE_valid, NO_RE_probably, features
 
 
-def return_targets(RE_lifetimes, base_path_re):
+def save_re_targets(RE_lifetimes, base_path_re, save_path_targets):
     '''
     Creates targets for training in a network later on. All timesteps that are within the runaway time window will be set to 1, those outside to 0.
 
@@ -54,6 +54,7 @@ def return_targets(RE_lifetimes, base_path_re):
     - RE_lifetimes (dict): Dictionary with shot numbers of runaway positive shots and their lifetime window(s).
                            If each shot has multiple lifetime intervals, it should be a list of tuples [(start1, end1), (start2, end2), ...].
     - base_path_re (str): Path to the folder containing the CSV files with the shot parameters, including those in RE_lifetimes.
+    - save_path_targets (str): Path where the targets should be saved as csv.
 
     Returns:
     - targets (dict): Dictionary where:
@@ -61,18 +62,31 @@ def return_targets(RE_lifetimes, base_path_re):
         - Values: NumPy arrays (binary masks, same length as the time series of each shot).
                   Each element is 1 if the timestep is within any runaway phase, otherwise 0.
     '''
-    
-    # Load CSV file and create target arrays for all shots
-    targets = {
-        shot_nr: (
-            lambda data, lifetimes: np.where(
-                np.any([(data['time'].values > start) & (data['time'].values < end) for start, end in lifetimes], axis=0)
-                if isinstance(lifetimes[0], (list, tuple)) else  # If multiple (start, end) pairs exist
-                (data['time'].values > lifetimes[0]) & (data['time'].values < lifetimes[1]),  # Single interval case
-                1, 0
-            )
-        )(pd.read_csv(os.path.join(base_path_re, f'JETno{shot_nr}.csv')), RE_lifetimes[shot_nr])
-        for shot_nr in RE_lifetimes.keys()
-    }
-    
+
+    # Ensure that the save path exists
+    os.makedirs(save_path_targets, exist_ok=True)
+
+    targets = {}
+
+    for shot_nr, lifetimes in RE_lifetimes.items():
+        # Load CSV file
+        file_path = os.path.join(base_path_re, f'JETno{shot_nr}.csv')
+        data = pd.read_csv(file_path)
+        time = data['time'].values  # Convert to NumPy array for efficiency
+
+        # Handle multiple lifetime intervals efficiently
+        if isinstance(lifetimes[0], (list, tuple)):  # Multiple (start, end) pairs
+            lifetime_arr = np.array(lifetimes)  # Convert list of tuples to NumPy array
+            mask = (time[:, None] > lifetime_arr[:, 0]) & (time[:, None] < lifetime_arr[:, 1])
+            target = np.any(mask, axis=1).astype(int)
+        else:  # Single interval case
+            target = ((time > lifetimes[0]) & (time < lifetimes[1])).astype(int)
+
+        # Store target in dictionary
+        targets[shot_nr] = target
+
+        # Save to CSV immediately
+        df = pd.DataFrame({'time': time, 'target': target})
+        df.to_csv(os.path.join(save_path_targets, f"{shot_nr}.csv"), index=False)
+
     return targets
