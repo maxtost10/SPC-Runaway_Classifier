@@ -37,7 +37,7 @@ def process_mat_file(file_path):
         processed_data = {}
 
         # Extract the necessary data from the .mat file
-        keys_jet = ['IPLA', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7']
+        keys_jet = ['IPLA', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7', 'ECE_PF']
         for key in keys_jet:
             if key in mat_contents['SIG'].dtype.names:
                 signal_data = mat_contents['SIG'][key][0][0]
@@ -86,7 +86,7 @@ def process_h5_file(file_path):
     processed_data = {}
 
     with h5py.File(file_path, 'r') as h5_file:
-        keys_jet = ['IPLA', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7']
+        keys_jet = ['IPLA', 'WMHD', 'RNT', 'DAO_EDG7', 'SSXcore', 'DAI_EDG7', 'ECE_PF']
         for key in keys_jet:
             if key in h5_file['SIG']:
                 signal_data = h5_file['SIG'][key]
@@ -148,7 +148,7 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, time
 
     return downsampled_time, downsampled_signal
 
-def downsample_and_merge(shot, file_name, keys=['SSXcore', 'IPLA', 'DAO_EDG7', 'WMHD', 'RNT', 'DAI_EDG7'], timestep_size=1e-3):
+def downsample_and_merge(shot, file_name, keys=['SSXcore', 'IPLA', 'DAO_EDG7', 'WMHD', 'RNT', 'DAI_EDG7', 'ECE_PF'], timestep_size=1e-3):
     """
     Downsample and merge time-series data for a single shot.
     Ensures all signals share the same time grid.
