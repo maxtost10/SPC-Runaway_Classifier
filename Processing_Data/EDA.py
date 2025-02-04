@@ -86,48 +86,38 @@ def compute_feature_statistics(dataframes, RE_valid, features):
 
 
 # Function to check for NaNs and Infs in a dictionary of DataFrames
-def check_nans_infs(dataframes, drop=False):
-    """
-    Checks for NaN (Not a Number) and Inf (Infinity) values in each DataFrame 
-    within a given dictionary of DataFrames. Optionally, it can remove 
-    DataFrames that contain NaNs or Infs.
+import numpy as np
 
+def check_nans_infs(dataframes):
+    """
+    Checks each DataFrame in the given dictionary for NaN (Not a Number)
+    and Inf (Infinity) values. Replaces NaN values with zeros.
+    
     Parameters:
-    - dataframes (dict): A dictionary where keys are DataFrame names 
-      (or identifiers) and values are pandas DataFrame objects.
-    - drop (bool, optional): If True, removes DataFrames containing NaNs 
-      or Infs from the dictionary. Default is False.
-
+    - dataframes (dict): A dictionary where the keys are identifiers for
+      DataFrames and the values are pandas DataFrame objects.
+      
     Returns:
-    - None: The function prints the count of NaNs and Infs for each DataFrame. 
-      If `drop=True`, it also removes affected DataFrames from the dictionary 
-      and prints the names of the dropped DataFrames.
+    - None: The function prints the count of NaNs and Infs for each DataFrame.
     """
-
-    # List to store keys of DataFrames that should be dropped
-    keys_to_drop = []
-
-    # Iterate over the dictionary of DataFrames
+    
+    # Iterate over each DataFrame in the dictionary
     for key, df in dataframes.items():
         # Count the total number of NaNs in the DataFrame
         nans = df.isna().sum().sum()
-
+        
         # Count the total number of Infs in the DataFrame
         infs = np.isinf(df).sum().sum()
+        
+        # If the DataFrame contains NaNs, replace them with zeros and print a message
+        if nans > 0:
+            print(f"DataFrame {key}: {nans} NaNs found. Replacing NaNs with 0.")
+            df.fillna(0, inplace=True)
+        
+        # If the DataFrame contains Infs, print the count
+        if infs > 0:
+            print(f"DataFrame {key}: {infs} Infs found.")
 
-        # If the DataFrame contains NaNs or Infs, print the counts
-        if nans > 0 or infs > 0:
-            print(f"DataFrame {key}: NaNs = {nans}, Infs = {infs}")
-            
-            # If drop is enabled, mark this DataFrame for removal
-            if drop:
-                keys_to_drop.append(key)
-
-    # If drop is enabled, remove DataFrames that contain NaNs or Infs
-    if drop:
-        for key in keys_to_drop:
-            del dataframes[key]  # Remove the DataFrame from the dictionary
-        print(f"Dropped DataFrames: {keys_to_drop}")
 
 
 def plot_jet_data(RE_DICT: pd.DataFrame, NO_RE_DICT: pd.DataFrame, save_path: str, x_lim_re=None, x_lim_no_re=None):
