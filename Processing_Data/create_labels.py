@@ -31,7 +31,7 @@ def load_and_process_data(base_path, re_autom_path, re_valid_path, check_nans_in
     RE_valid = list(pd.read_csv(re_valid_path, header=None)[0])
 
     # Check and clean NaNs/Infs
-    check_nans_infs(dataframes, drop=True)
+    check_nans_infs(dataframes)
 
     # Update shot lists to include only those present in dataframes
     RE_autom = [shot for shot in RE_autom if shot in dataframes]
