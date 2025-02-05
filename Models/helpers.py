@@ -1,0 +1,223 @@
+import os
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import torch
+from torch.utils.data import Dataset, DataLoader, random_split
+import torch.nn.functional as F  # Import for one-hot encoding
+import torch.nn as nn
+
+class IndependentCSVDataset(Dataset):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, num_classes=2):
+        """
+        Loads each CSV file and stores individual samples (row-wise) as tuples of (x, y), 
+        while ensuring targets are one-hot encoded.
+
+        Parameters:
+        - data_path (str or Path): Base directory containing 'features' and 'targets' subdirectories.
+        - features_list (list of str): List of CSV file names to process.
+        - features_sequence (list of str): List of feature names to extract from each CSV.
+          Defaults to ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF'] if not provided.
+        - transform (callable, optional): Optional transform to be applied on the feature data.
+        - seq_length (int): Ensures all sequences have the same length.
+        - num_classes (int): Number of classes for one-hot encoding.
+        """
+        if features_sequence is None:
+            features_sequence = ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF']
+        
+        self.samples = []  # List to hold individual (x, y) tuples
+        self.transform = transform
+        self.num_classes = num_classes  # Store number of classes for one-hot encoding
+        
+        # Define directories using pathlib
+        features_dir = Path(data_path) / "features"
+        targets_dir  = Path(data_path) / "targets"
+        
+        # Process each CSV file in the provided list
+        for feature_id in features_list:
+            feature_file = features_dir / feature_id
+            target_file  = targets_dir / feature_id
+            
+            # Load the features CSV
+            df_features = pd.read_csv(feature_file)
+            time_length = len(df_features['time'])
+
+            # Drop sequences with a length different from the desired one
+            if time_length != seq_length:
+                print(f'Skipping {feature_id}: sequence length {time_length} is unexpected.')
+                continue
+            
+            # Build the feature matrix for the file.
+            # For each key in features_sequence, use the column if available, otherwise use zeros.
+            x_list = []
+            for key in features_sequence:
+                if key in df_features.columns:
+                    x_list.append(df_features[key].to_numpy())
+                else:
+                    x_list.append(np.zeros(time_length))
+            
+            # x_file is a 2D array with shape (time_length, number_of_features)
+            x_file = np.column_stack(x_list)
+            
+            # Load the targets CSV and extract the 'target' column
+            y_file = pd.read_csv(target_file)['target'].to_numpy()  # shape: (time_length,)
+            
+            # Append each shot to the samples list.
+            self.samples.append((x_file, y_file))
+    
+    def __len__(self):
+        """Return the total number of samples."""
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        """Return a single sample as a tuple (x, y) with one-hot encoded target."""
+        sample, target = self.samples[idx]
+        
+        if self.transform:
+            sample = self.transform(sample)
+        
+        # Convert the sample to PyTorch tensor
+        sample = torch.tensor(sample, dtype=torch.float32)
+
+        # Convert target to tensor and apply one-hot encoding
+        target = torch.tensor(target, dtype=torch.long)  # Ensure integer values
+        target = F.one_hot(target, num_classes=self.num_classes).float()  # One-hot encode to (seq_length, num_classes)
+        
+        return sample, target
+
+
+
+def compute_global_minmax(dataset):
+    """
+    Computes global min and max for each feature across all time series in the dataset.
+    
+    Assumes that each sample from the dataset is a tuple (sample, target) where
+    sample is a torch.Tensor of shape [sequence_length, num_features].
+    
+    Returns:
+    - feature_min: NumPy array of shape (num_features,)
+    - feature_max: NumPy array of shape (num_features,)
+    """
+    all_samples = []
+    for sample, _ in dataset:
+        if isinstance(sample, torch.Tensor):
+            sample = sample.numpy()
+        all_samples.append(sample)
+    
+    all_data = np.concatenate(all_samples, axis=0)
+    
+    # Compute min and max along axis 0 (for each feature)
+    feature_min = np.min(all_data, axis=0)
+    feature_max = np.max(all_data, axis=0)
+    
+    # Avoid division by zero by ensuring feature_max is strictly greater than feature_min
+    zero_variance_mask = (feature_max == feature_min)
+    feature_max[zero_variance_mask] = feature_min[zero_variance_mask] + 1e-6
+    
+    return feature_min, feature_max
+
+
+class GlobalMinMaxNormalize:
+    def __init__(self, min_vals, max_vals):
+        """
+        min_vals: array-like of shape (num_features,)
+        max_vals: array-like of shape (num_features,)
+        """
+        # Convert min and max values to torch tensors for compatibility.
+        self.min_vals = torch.tensor(min_vals, dtype=torch.float32)
+        self.max_vals = torch.tensor(max_vals, dtype=torch.float32)
+    
+    def __call__(self, sample):
+        """
+        Normalizes the input sample using the global min and max values.
+        sample: torch.Tensor of shape [sequence_length, num_features]
+        Returns the normalized sample.
+        """
+        if not isinstance(sample, torch.Tensor):
+            sample = torch.tensor(sample, dtype=torch.float32)
+        return (sample - self.min_vals) / (self.max_vals - self.min_vals)
+
+
+
+class LSTMModel(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.0):
+        """
+        LSTM model where the same fully connected layer is applied to each cell state.
+        
+        Parameters:
+        - input_size (int): Number of input features per time step.
+        - hidden_size (int): Number of LSTM hidden units.
+        - num_layers (int): Number of LSTM layers.
+        - output_size (int): Number of output units (1 for binary classification).
+        - dropout (float): Dropout probability (only for intermediate LSTM layers).
+        """
+        super(LSTMModel, self).__init__()
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+
+        # Define LSTM layer
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
+
+        # Fully connected layer (shared across all timesteps)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+        # Sigmoid activation for binary classification
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        """
+        Forward pass of the model.
+
+        Parameters:
+        - x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, input_size]
+
+        Returns:
+        - out (torch.Tensor): Output tensor of shape [batch_size, sequence_length, output_size]
+        """
+
+        # Forward propagate LSTM
+        # out: shape (batch_size, seq_length, hidden_size)
+        out, (_, _) = self.lstm(x)
+
+        # Apply the same fully connected layer to each timestep's cell state
+        out = self.fc(out)  # Shape: (batch_size, seq_length, output_size)
+
+        # Apply Sigmoid activation for binary classification
+        out = self.sigmoid(out)  # Shape: (batch_size, seq_length, output_size)
+
+        # Remove last dimension to match target size
+        out = out.squeeze(-1)
+
+        return out  # Binary values per timestep
+
+
+def compute_class_weights(train_loader, num_classes=2):
+    """
+    Iterates through the train_loader, counts the occurrences of each class, 
+    and computes class weights for imbalanced classification.
+
+    Args:
+        train_loader (DataLoader): PyTorch DataLoader with training data.
+        num_classes (int): Number of unique classes. Default is 2 (binary classification).
+
+    Returns:
+        class_weights (torch.Tensor): Computed class weights (to be used in BCEWithLogitsLoss).
+    """
+    class_counts = torch.zeros(num_classes)  # Initialize count array
+
+    # Iterate through the DataLoader
+    for _, targets in train_loader:
+        targets = targets.view(-1, num_classes)  # Flatten batch and sequence length, keep num_classes
+
+        # Sum occurrences across batch & sequence dimension
+        class_counts += targets.sum(dim=0)  # Count occurrences for each class
+
+    # Compute inverse class frequency
+    class_weights = 1.0 / class_counts
+    class_weights = class_weights / class_weights.sum()  # Normalize (optional)
+
+    print(f"Class counts: {class_counts.tolist()}")
+    print(f"Class weights: {class_weights.tolist()}")
+
+    return class_weights
