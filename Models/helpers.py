@@ -142,66 +142,61 @@ class GlobalMinMaxNormalize:
 
 
 
+import torch
+
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.0):
-        """
-        LSTM model where the same fully connected layer is applied to each cell state.
-        
-        Parameters:
-        - input_size (int): Number of input features per time step.
-        - hidden_size (int): Number of LSTM hidden units.
-        - num_layers (int): Number of LSTM layers.
-        - output_size (int): Number of output units (1 for binary classification).
-        - dropout (float): Dropout probability (only for intermediate LSTM layers).
-        """
         super().__init__()
-
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
         # Define LSTM layer
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
 
-        # Fully connected layer (shared across all timesteps)
+        # Fully connected layers
         self.fc1 = nn.Linear(hidden_size, hidden_size)
-        
-        # Fully connected layer (shared across all timesteps)
         self.fc2 = nn.Linear(hidden_size, output_size)
 
         # Sigmoid activation for binary classification
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        # Forward propagate LSTM
+        out, (_, _) = self.lstm(x)
+
+        # Fully connected layers
+        out = self.fc1(out)
+        out = self.sigmoid(out)
+        out = self.fc2(out)
+        out = self.sigmoid(out)
+
+        # Remove last dimension to match target size
+        return out.squeeze(-1)  # Binary values per timestep
+
+    def predict(self, x, threshold=0.5, device="cpu"):
         """
-        Forward pass of the model.
+        Predict binary outputs using a threshold.
 
         Parameters:
         - x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, input_size]
+        - threshold (float): Decision threshold (default=0.5)
+        - device (str): Device ('cuda' or 'cpu')
 
         Returns:
-        - out (torch.Tensor): Output tensor of shape [batch_size, sequence_length, output_size]
+        - Binary predictions (0 or 1) as a torch.Tensor of shape [batch_size, sequence_length]
+        - Raw probabilities (before thresholding)
         """
+        self.eval()  # Set model to evaluation mode
+        x = x.to(device)
 
-        # Forward propagate LSTM
-        # out: shape (batch_size, seq_length, hidden_size)
-        out, (_, _) = self.lstm(x)
+        with torch.no_grad():  # No gradients needed for inference
+            probs = self.forward(x)  # Get probabilities from forward pass
 
-        # Apply the same fully connected layer to each timestep's cell state
-        out = self.fc1(out)  # Shape: (batch_size, seq_length, hidden_size)
+        # Apply threshold to convert probabilities into binary predictions
+        predictions = (probs > threshold).int()
 
-        # Apply Sigmoid activation for binary classification
-        out = self.sigmoid(out)  # Shape: (batch_size, seq_length, hidden_size)
+        return predictions, probs  # Return both predictions and raw probabilities
 
-        # Apply the same fully connected layer to the last layer
-        out = self.fc2(out)  # Shape: (batch_size, seq_length, output_size)
-
-        # Apply Sigmoid activation for binary classification
-        out = self.sigmoid(out)  # Shape: (batch_size, seq_length, output_size)
-
-        # Remove last dimension to match target size
-        out = out.squeeze(-1)
-
-        return out  # Binary values per timestep
 
 
 def compute_class_weights(train_loader, num_classes=2):
