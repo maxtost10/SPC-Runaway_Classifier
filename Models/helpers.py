@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn.functional as F  # Import for one-hot encoding
 import torch.nn as nn
+import random
 
 class IndependentCSVDataset(Dataset):
     def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, num_classes=2):
@@ -22,6 +23,9 @@ class IndependentCSVDataset(Dataset):
         - seq_length (int): Ensures all sequences have the same length.
         - num_classes (int): Number of classes for one-hot encoding.
         """
+
+        random.shuffle(features_list) # Shuffle the list of features to avoid overfitting on the order of the features
+
         if features_sequence is None:
             features_sequence = ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF']
         
@@ -80,8 +84,7 @@ class IndependentCSVDataset(Dataset):
         sample = torch.tensor(sample, dtype=torch.float32)
 
         # Convert target to tensor and apply one-hot encoding
-        target = torch.tensor(target, dtype=torch.long)  # Ensure integer values
-        target = F.one_hot(target, num_classes=self.num_classes).float()  # One-hot encode to (seq_length, num_classes)
+        target = torch.tensor(target, dtype=torch.float32)  # Ensure integer values
         
         return sample, target
 
@@ -151,7 +154,7 @@ class LSTMModel(nn.Module):
         - output_size (int): Number of output units (1 for binary classification).
         - dropout (float): Dropout probability (only for intermediate LSTM layers).
         """
-        super(LSTMModel, self).__init__()
+        super().__init__()
 
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -160,7 +163,10 @@ class LSTMModel(nn.Module):
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
 
         # Fully connected layer (shared across all timesteps)
-        self.fc = nn.Linear(hidden_size, output_size)
+        self.fc1 = nn.Linear(hidden_size, hidden_size)
+        
+        # Fully connected layer (shared across all timesteps)
+        self.fc2 = nn.Linear(hidden_size, output_size)
 
         # Sigmoid activation for binary classification
         self.sigmoid = nn.Sigmoid()
@@ -181,7 +187,13 @@ class LSTMModel(nn.Module):
         out, (_, _) = self.lstm(x)
 
         # Apply the same fully connected layer to each timestep's cell state
-        out = self.fc(out)  # Shape: (batch_size, seq_length, output_size)
+        out = self.fc1(out)  # Shape: (batch_size, seq_length, hidden_size)
+
+        # Apply Sigmoid activation for binary classification
+        out = self.sigmoid(out)  # Shape: (batch_size, seq_length, hidden_size)
+
+        # Apply the same fully connected layer to the last layer
+        out = self.fc2(out)  # Shape: (batch_size, seq_length, output_size)
 
         # Apply Sigmoid activation for binary classification
         out = self.sigmoid(out)  # Shape: (batch_size, seq_length, output_size)
@@ -202,22 +214,17 @@ def compute_class_weights(train_loader, num_classes=2):
         num_classes (int): Number of unique classes. Default is 2 (binary classification).
 
     Returns:
-        class_weights (torch.Tensor): Computed class weights (to be used in BCEWithLogitsLoss).
+        torch.Tensor: Ratio of class 0 to class 1 (to be used as `pos_weight` in BCEWithLogitsLoss).
     """
     class_counts = torch.zeros(num_classes)  # Initialize count array
 
-    # Iterate through the DataLoader
+    # Accumulate counts for class 0 and class 1
     for _, targets in train_loader:
-        targets = targets.view(-1, num_classes)  # Flatten batch and sequence length, keep num_classes
-
-        # Sum occurrences across batch & sequence dimension
-        class_counts += targets.sum(dim=0)  # Count occurrences for each class
-
-    # Compute inverse class frequency
-    class_weights = 1.0 / class_counts
-    class_weights = class_weights / class_weights.sum()  # Normalize (optional)
+        class_counts[1] += targets.sum().item()  # Count 1s
+        class_counts[0] += (targets.numel() - targets.sum().item())  # Count 0s
 
     print(f"Class counts: {class_counts.tolist()}")
-    print(f"Class weights: {class_weights.tolist()}")
+    print(f"Class ratio: {class_counts[0] / class_counts[1]}")
 
-    return class_weights
+    # Convert to tensor (important for compatibility with BCEWithLogitsLoss)
+    return torch.tensor(class_counts[0] / class_counts[1], dtype=torch.float32)
