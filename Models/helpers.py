@@ -223,3 +223,93 @@ def compute_class_weights(train_loader, num_classes=2):
 
     # Convert to tensor (important for compatibility with BCEWithLogitsLoss)
     return torch.tensor(class_counts[0] / class_counts[1], dtype=torch.float32)
+
+
+
+class TransformerModel(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.2, num_heads=8):
+        """
+        Transformer model for sequence classification.
+
+        Parameters:
+        - input_size (int): Number of input features per time step.
+        - hidden_size (int): Hidden dimension of the Transformer model.
+        - num_layers (int): Number of Transformer encoder layers.
+        - output_size (int): Number of output units (1 for binary classification).
+        - dropout (float): Dropout probability.
+        - num_heads (int): Number of attention heads.
+        """
+        super().__init__()
+
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.num_heads = num_heads
+
+        # Linear layer to project input to Transformer hidden size
+        self.input_projection = nn.Linear(input_size, hidden_size)
+
+        # Transformer Encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_size, 
+            nhead=num_heads, 
+            dim_feedforward=hidden_size * 4,  # Feedforward dimension
+            dropout=dropout, 
+            batch_first=True  # Ensures input shape: (batch, seq_len, hidden_size)
+        )
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+        # Fully connected layers
+        self.fc1 = nn.Linear(hidden_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+        # Sigmoid activation for binary classification
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        """
+        Forward pass of the Transformer model.
+
+        Parameters:
+        - x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, input_size]
+
+        Returns:
+        - out (torch.Tensor): Output tensor of shape [batch_size, sequence_length, output_size]
+        """
+        # Project input to hidden_size dimension
+        x = self.input_projection(x)  # Shape: (batch, seq_len, hidden_size)
+
+        # Pass through Transformer Encoder
+        x = self.transformer_encoder(x)  # Shape: (batch, seq_len, hidden_size)
+
+        # Fully connected layers
+        x = self.fc1(x)
+        x = self.sigmoid(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+
+        # Remove last dimension to match target size
+        return x.squeeze(-1)  # Binary values per timestep
+
+    def predict(self, x, threshold=0.5, device="cpu"):
+        """
+        Predict binary outputs using a threshold.
+
+        Parameters:
+        - x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, input_size]
+        - threshold (float): Decision threshold (default=0.5)
+        - device (str): Device ('cuda' or 'cpu')
+
+        Returns:
+        - Binary predictions (0 or 1) as a torch.Tensor of shape [batch_size, sequence_length]
+        - Raw probabilities (before thresholding)
+        """
+        self.eval()  # Set model to evaluation mode
+        x = x.to(device)
+
+        with torch.no_grad():  # No gradients needed for inference
+            probs = self.forward(x)  # Get probabilities from forward pass
+
+        # Apply threshold to convert probabilities into binary predictions
+        predictions = (probs > threshold).int()
+
+        return predictions, probs  # Return both predictions and raw probabilities
