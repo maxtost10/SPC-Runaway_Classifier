@@ -9,50 +9,47 @@ import torch.nn as nn
 import random
 
 class IndependentCSVDataset(Dataset):
-    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, num_classes=2):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, chunk_size=1):
         """
-        Loads each CSV file and stores individual samples (row-wise) as tuples of (x, y), 
-        while ensuring targets are one-hot encoded.
+        Loads each CSV file, splits sequences into smaller chunks, and reshapes them to (60, 600).
 
         Parameters:
         - data_path (str or Path): Base directory containing 'features' and 'targets' subdirectories.
         - features_list (list of str): List of CSV file names to process.
         - features_sequence (list of str): List of feature names to extract from each CSV.
-          Defaults to ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF'] if not provided.
         - transform (callable, optional): Optional transform to be applied on the feature data.
-        - seq_length (int): Ensures all sequences have the same length.
-        - num_classes (int): Number of classes for one-hot encoding.
+        - seq_length (int): Expected original sequence length before splitting.
+        - chunk_size (int): The number of time steps per chunk (default=100).
         """
 
-        random.shuffle(features_list) # Shuffle the list of features to avoid overfitting on the order of the features
+        random.shuffle(features_list)  # Shuffle dataset order
 
         if features_sequence is None:
             features_sequence = ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF']
         
-        self.samples = []  # List to hold individual (x, y) tuples
+        self.samples = []  # Stores (x, y) tuples
         self.transform = transform
-        self.num_classes = num_classes  # Store number of classes for one-hot encoding
-        
-        # Define directories using pathlib
+        self.chunk_size = chunk_size  # How many time steps per chunk
+        self.num_chunks = seq_length // chunk_size  # 6000 // 100 = 60 chunks per sequence
+
         features_dir = Path(data_path) / "features"
         targets_dir  = Path(data_path) / "targets"
-        
-        # Process each CSV file in the provided list
+
+        # Process each CSV file
         for feature_id in features_list:
             feature_file = features_dir / feature_id
             target_file  = targets_dir / feature_id
             
-            # Load the features CSV
+            # Load features
             df_features = pd.read_csv(feature_file)
             time_length = len(df_features['time'])
 
-            # Drop sequences with a length different from the desired one
+            # Drop unexpected sequence lengths
             if time_length != seq_length:
                 print(f'Skipping {feature_id}: sequence length {time_length} is unexpected.')
                 continue
             
-            # Build the feature matrix for the file.
-            # For each key in features_sequence, use the column if available, otherwise use zeros.
+            # Extract feature columns or use zeros if missing
             x_list = []
             for key in features_sequence:
                 if key in df_features.columns:
@@ -60,33 +57,41 @@ class IndependentCSVDataset(Dataset):
                 else:
                     x_list.append(np.zeros(time_length))
             
-            # x_file is a 2D array with shape (time_length, number_of_features)
+            # Convert to (time_length, num_features) = (6000, 6)
             x_file = np.column_stack(x_list)
-            
-            # Load the targets CSV and extract the 'target' column
-            y_file = pd.read_csv(target_file)['target'].to_numpy()  # shape: (time_length,)
-            
-            # Append each shot to the samples list.
-            self.samples.append((x_file, y_file))
-    
+
+            # Load targets
+            y_file = pd.read_csv(target_file)['target'].to_numpy()  # Shape: (time_length,)
+
+            # Reshape into (60, 100, 6) and then flatten 2nd axis → (60, 600)
+            x_reshaped = x_file.reshape(self.num_chunks, self.chunk_size, -1)  # (60, 100, 6)
+            x_final = x_reshaped.reshape(self.num_chunks, -1)  # (60, 600)
+
+            # Do the same with targets (no flattening)
+            y_reshaped = y_file.reshape(self.num_chunks, self.chunk_size)  # (60, 100)
+
+            # Store each new sequence as a sample
+            self.samples.append((x_final, y_reshaped))
+
+        print(f"Processed {len(self.samples)} sequences with shape {x_final.shape}.")
+
     def __len__(self):
         """Return the total number of samples."""
         return len(self.samples)
     
     def __getitem__(self, idx):
-        """Return a single sample as a tuple (x, y) with one-hot encoded target."""
+        """Return a single sample (x, y) with tensor conversion."""
         sample, target = self.samples[idx]
         
         if self.transform:
             sample = self.transform(sample)
-        
-        # Convert the sample to PyTorch tensor
-        sample = torch.tensor(sample, dtype=torch.float32)
 
-        # Convert target to tensor and apply one-hot encoding
-        target = torch.tensor(target, dtype=torch.float32)  # Ensure integer values
-        
+        # Convert to PyTorch tensors
+        sample = torch.tensor(sample, dtype=torch.float32)  # (60, 600)
+        target = torch.tensor(target, dtype=torch.float32)  # (60, 100)
+
         return sample, target
+
 
 
 
@@ -168,7 +173,7 @@ class LSTMModel(nn.Module):
         out = self.fc1(out)
         out = self.sigmoid(out)
         out = self.fc2(out)
-        out = self.sigmoid(out)
+        # out = self.sigmoid(out)
 
         # Remove last dimension to match target size
         return out.squeeze(-1)  # Binary values per timestep
