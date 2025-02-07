@@ -8,6 +8,86 @@ import torch.nn.functional as F  # Import for one-hot encoding
 import torch.nn as nn
 import random
 
+
+class IndependentCSVDatasetTCN(Dataset):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000):
+        """
+        Loads each CSV file and stores individual samples (row-wise) as tuples of (x, y), 
+        while ensuring targets are one-hot encoded.
+
+        Parameters:
+        - data_path (str or Path): Base directory containing 'features' and 'targets' subdirectories.
+        - features_list (list of str): List of CSV file names to process.
+        - features_sequence (list of str): List of feature names to extract from each CSV.
+          Defaults to ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF'] if not provided.
+        - transform (callable, optional): Optional transform to be applied on the feature data.
+        - seq_length (int): Ensures all sequences have the same length.
+        """
+
+        random.shuffle(features_list) # Shuffle the list of features to avoid overfitting on the order of the features
+
+        if features_sequence is None:
+            features_sequence = ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF']
+        
+        self.samples = []  # List to hold individual (x, y) tuples
+        self.transform = transform
+        
+        # Define directories using pathlib
+        features_dir = Path(data_path) / "features"
+        targets_dir  = Path(data_path) / "targets"
+        
+        # Process each CSV file in the provided list
+        for feature_id in features_list:
+            feature_file = features_dir / feature_id
+            target_file  = targets_dir / feature_id
+            
+            # Load the features CSV
+            df_features = pd.read_csv(feature_file)
+            time_length = len(df_features['time'])
+
+            # Drop sequences with a length different from the desired one
+            if time_length != seq_length:
+                print(f'Skipping {feature_id}: sequence length {time_length} is unexpected.')
+                continue
+            
+            # Build the feature matrix for the file.
+            # For each key in features_sequence, use the column if available, otherwise use zeros.
+            x_list = []
+            for key in features_sequence:
+                if key in df_features.columns:
+                    x_list.append(df_features[key].to_numpy())
+                else:
+                    x_list.append(np.zeros(time_length))
+            
+            # x_file is a 2D array with shape (time_length, number_of_features)
+            x_file = np.column_stack(x_list)
+            
+            # Load the targets CSV and extract the 'target' column
+            y_file = pd.read_csv(target_file)['target'].to_numpy()  # shape: (time_length,)
+            
+            # Append each shot to the samples list.
+            self.samples.append((x_file, y_file))
+    
+    def __len__(self):
+        """Return the total number of samples."""
+        return len(self.samples)
+    
+    def __getitem__(self, idx):
+        """Return a single sample as a tuple (x, y) with one-hot encoded target."""
+        sample, target = self.samples[idx]
+        
+        if self.transform:
+            sample = self.transform(sample)
+        
+        # Convert the sample to PyTorch tensor
+        sample = torch.tensor(sample, dtype=torch.float32)
+
+        # Convert target to tensor and apply one-hot encoding
+        target = torch.tensor(target, dtype=torch.float32)  # Ensure integer values
+        
+        return sample, target
+
+
 class IndependentCSVDataset(Dataset):
     def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=40, stride=10):
         """
@@ -300,3 +380,68 @@ class TransformerModel(nn.Module):
         predictions = (probs > threshold).int()
 
         return predictions, probs  # Return both predictions and raw probabilities
+
+class TemporalConvNet(nn.Module):
+    def __init__(self, input_size, num_channels, kernel_size=3, dropout=0.2):
+        super().__init__()
+        layers = []
+        num_levels = len(num_channels)
+
+        for i in range(num_levels):
+            dilation_size = 2 ** i
+            in_channels = input_size if i == 0 else num_channels[i - 1]
+            out_channels = num_channels[i]
+
+            # Systematic padding to keep sequence length unchanged
+            padding = (kernel_size - 1) * dilation_size // 2  
+
+            layers += [
+                nn.Conv1d(in_channels, out_channels, kernel_size,
+                          stride=1, padding=padding, dilation=dilation_size),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            ]
+
+        self.network = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.network(x)
+
+
+class TCNModel(nn.Module):
+    def __init__(self, input_size, output_size, num_channels, kernel_size=3, dropout=0.2):
+        super().__init__()  # Fixes incorrect call to super()
+        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size, dropout)
+        self.fc = nn.Linear(num_channels[-1], output_size)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1)  # Convert (batch, seq, feature) -> (batch, feature, seq) for Conv1D
+        out = self.tcn(x)
+        out = out.permute(0, 2, 1)  # Convert back to (batch, seq, feature)
+        out = self.fc(out)  # Fully connected layer per timestep
+        # out = self.sigmoid(out)  # No Sigmoid activation for BCEWithLogitsLoss
+        return out.squeeze(-1)  # Binary values per timestep
+
+    def predict(self, x, threshold=0.5, device="cpu"):
+        """
+        Predict binary outputs using a threshold.
+        
+        Parameters:
+        - x (torch.Tensor): Input tensor of shape [batch_size, sequence_length, input_size]
+        - threshold (float): Decision threshold (default=0.5)
+        - device (str): Device ('cuda' or 'cpu')
+
+        Returns:
+        - Binary predictions (0 or 1) as a torch.Tensor of shape [batch_size, sequence_length]
+        - Raw probabilities (before thresholding)
+        """
+        self.eval()
+        x = x.to(device)
+
+        with torch.no_grad():
+            out = self.forward(x)
+            probs = self.sigmoid(out)
+
+        predictions = (probs > threshold).int()
+        return predictions, probs
