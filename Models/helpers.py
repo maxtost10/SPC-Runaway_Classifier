@@ -7,84 +7,73 @@ from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn.functional as F  # Import for one-hot encoding
 import torch.nn as nn
 import random
-#
-class IndependentCSVDataset(Dataset):
-    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000):
-        """
-        Loads each CSV file and stores individual samples (row-wise) as tuples of (x, y), 
-        while ensuring targets are one-hot encoded.
 
+class IndependentCSVDataset(Dataset):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=40, stride=10):
+        """
+        Loads each CSV file and applies a sliding window to create independent samples (x, y).
+        
         Parameters:
         - data_path (str or Path): Base directory containing 'features' and 'targets' subdirectories.
         - features_list (list of str): List of CSV file names to process.
         - features_sequence (list of str): List of feature names to extract from each CSV.
           Defaults to ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF'] if not provided.
         - transform (callable, optional): Optional transform to be applied on the feature data.
-        - seq_length (int): Ensures all sequences have the same length.
+        - seq_length (int): Ensures all sequences have the same length before windowing.
+        - window (int): Size of the sliding window.
+        - stride (int): Step size for the sliding window.
         """
-
-        random.shuffle(features_list) # Shuffle the list of features to avoid overfitting on the order of the features
+        random.shuffle(features_list)  # Shuffle data to prevent order bias
 
         if features_sequence is None:
             features_sequence = ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF']
-        
-        self.samples = []  # List to hold individual (x, y) tuples
+
+        self.samples = []  # List to store (x, y) samples
         self.transform = transform
         
-        # Define directories using pathlib
         features_dir = Path(data_path) / "features"
-        targets_dir  = Path(data_path) / "targets"
-        
-        # Process each CSV file in the provided list
+        targets_dir = Path(data_path) / "targets"
+
         for feature_id in features_list:
             feature_file = features_dir / feature_id
-            target_file  = targets_dir / feature_id
-            
-            # Load the features CSV
+            target_file = targets_dir / feature_id
+
             df_features = pd.read_csv(feature_file)
             time_length = len(df_features['time'])
 
-            # Drop sequences with a length different from the desired one
             if time_length != seq_length:
                 print(f'Skipping {feature_id}: sequence length {time_length} is unexpected.')
                 continue
-            
-            # Build the feature matrix for the file.
-            # For each key in features_sequence, use the column if available, otherwise use zeros.
-            x_list = []
-            for key in features_sequence:
-                if key in df_features.columns:
-                    x_list.append(df_features[key].to_numpy())
-                else:
-                    x_list.append(np.zeros(time_length))
-            
-            # x_file is a 2D array with shape (time_length, number_of_features)
+
+            # Extract feature matrix (time_length, num_features)
+            x_list = [df_features[key].to_numpy() if key in df_features.columns else np.zeros(time_length) for key in features_sequence]
             x_file = np.column_stack(x_list)
             
-            # Load the targets CSV and extract the 'target' column
-            y_file = pd.read_csv(target_file)['target'].to_numpy()  # shape: (time_length,)
-            
-            # Append each shot to the samples list.
-            self.samples.append((x_file, y_file))
+            # Extract target values (time_length,)
+            y_file = pd.read_csv(target_file)['target'].to_numpy()
+
+            # Apply sliding window
+            for start in range(0, seq_length - window + 1, stride):
+                x_chunk = x_file[start:start + window]  # Shape: (window, num_features)
+                y_chunk = y_file[start:start + window]  # Shape: (window,)
+                self.samples.append((x_chunk, y_chunk))
+
+        print(f"Total sliding window samples created: {len(self.samples)}")
     
     def __len__(self):
-        """Return the total number of samples."""
         return len(self.samples)
     
     def __getitem__(self, idx):
-        """Return a single sample as a tuple (x, y) with one-hot encoded target."""
-        sample, target = self.samples[idx]
+        x, y = self.samples[idx]
         
         if self.transform:
-            sample = self.transform(sample)
+            x = self.transform(x)
         
-        # Convert the sample to PyTorch tensor
-        sample = torch.tensor(sample, dtype=torch.float32)
+        x = torch.tensor(x, dtype=torch.float32)  # Convert features to tensor
+        y = torch.tensor(y, dtype=torch.float32)  # Convert target to tensor
+        
+        return x, y
 
-        # Convert target to tensor and apply one-hot encoding
-        target = torch.tensor(target, dtype=torch.float32)  # Ensure integer values
-        
-        return sample, target
 
 
 
@@ -166,7 +155,7 @@ class LSTMModel(nn.Module):
         out = self.fc1(out)
         out = self.sigmoid(out)
         out = self.fc2(out)
-        out = self.sigmoid(out)
+        # out = self.sigmoid(out)
 
         # Remove last dimension to match target size
         return out.squeeze(-1)  # Binary values per timestep
