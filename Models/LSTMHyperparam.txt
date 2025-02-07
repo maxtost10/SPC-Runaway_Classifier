@@ -1,0 +1,1 @@
+[I 2025-02-06 18:18:11,532] Trial 0 finished with value: 0.07421523982006616 and parameters: {'hidden_size': 91, 'num_layers': 3, 'dropout': 0.2793024809123615, 'learning_rate': 0.0011805500123018993, 'weight_decay': 1.0630248708052972e-05}. Best is trial 0 with value: 0.07421523982006616.
