@@ -9,7 +9,7 @@ import torch.nn as nn
 import random
 
 class IndependentCSVDataset(Dataset):
-    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, num_classes=2):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000):
         """
         Loads each CSV file and stores individual samples (row-wise) as tuples of (x, y), 
         while ensuring targets are one-hot encoded.
@@ -21,7 +21,6 @@ class IndependentCSVDataset(Dataset):
           Defaults to ['SSXcore', 'IPLA', 'DAO_EDG7', 'RNT', 'DAI_EDG7', 'ECE_PF'] if not provided.
         - transform (callable, optional): Optional transform to be applied on the feature data.
         - seq_length (int): Ensures all sequences have the same length.
-        - num_classes (int): Number of classes for one-hot encoding.
         """
 
         random.shuffle(features_list) # Shuffle the list of features to avoid overfitting on the order of the features
@@ -31,7 +30,6 @@ class IndependentCSVDataset(Dataset):
         
         self.samples = []  # List to hold individual (x, y) tuples
         self.transform = transform
-        self.num_classes = num_classes  # Store number of classes for one-hot encoding
         
         # Define directories using pathlib
         features_dir = Path(data_path) / "features"
