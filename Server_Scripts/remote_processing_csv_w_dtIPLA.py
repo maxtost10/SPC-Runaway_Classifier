@@ -204,14 +204,30 @@ def process_and_save_as_csv(file_path, output_folder):
         merged_df = downsample_and_merge(shot_data, file_name)
         if merged_df.empty:
             raise ValueError("")
+        merged_df = Append_dtIPLA(merged_df) # Append the time derivative of the IPLA signal
         merged_df.to_csv(output_file, index=False)
         print("Saved downsampled data of file {} to {}".format(file_path, output_file))
     except Exception as e:
         print("Failed to process {}: {}".format(file_path, e))
 
+def Append_dtIPLA(merged_df):
+    """
+    Append the time derivative of the IPLA signal to the DataFrame.
+    """
+    IPLA_signal = merged_df['IPLA'].values
+    IPLA_time = merged_df['time'].values
+
+    # Calculate the time derivative of the IPLA signal
+    dtIPLA_signal = np.gradient(IPLA_signal, IPLA_time)
+
+    # Append the time derivative to the DataFrame
+    merged_df['dtIPLA'] = dtIPLA_signal
+
+    return merged_df
+
 def main():
     remote_path = "/Lac8_D/DEFUSE/DEFUSE_DB/DB_mat/"
-    output_folder = "/home/tost/NoTivoli/downsampled_csvs/"
+    output_folder = "/home/tost/NoTivoli/downsampled_csvs_w_dtIPLA/"
 
     # Check if the output folder exists; if not, create it
     if not os.path.exists(output_folder):
