@@ -89,7 +89,7 @@ class IndependentCSVDatasetTCN(Dataset):
 
 
 class IndependentCSVDataset(Dataset):
-    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=40, stride=10):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=50, stride=10):
         """
         Loads each CSV file and applies a sliding window to create independent samples (x, y).
         
