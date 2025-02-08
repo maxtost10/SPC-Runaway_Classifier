@@ -67,24 +67,29 @@ def save_re_targets(RE_lifetimes, base_path_re, save_path_targets):
     os.makedirs(save_path_targets, exist_ok=True)
 
     targets = {}
+    non_existing_shots = []
 
     for shot_nr, lifetimes in RE_lifetimes.items():
         # Load CSV file
-        file_path = os.path.join(base_path_re, f'JETno{shot_nr}.csv')
-        data = pd.read_csv(file_path)
-        time = data['time']  # Convert to NumPy array for efficiency
-        
-        target = np.zeros(len(time))
+        try:
+            file_path = os.path.join(base_path_re, f'JETno{shot_nr}.csv')
+            data = pd.read_csv(file_path)
+            time = data['time']  # Convert to NumPy array for efficiency
+            
+            target = np.zeros(len(time))
 
-        # Store target in dictionary
-        target[(time>lifetimes[0]) & (time<lifetimes[1])]=1
-        targets[shot_nr] = np.copy(target)
+            # Store target in dictionary
+            target[(time>lifetimes[0]) & (time<lifetimes[1])]=1
+            targets[shot_nr] = np.copy(target)
 
-        # Save to CSV immediately
-        df = pd.DataFrame({'time': time, 'target': np.copy(target)})
-        df.to_csv(os.path.join(save_path_targets, f"JETno{shot_nr}.csv"), index=False)
+            # Save to CSV immediately
+            df = pd.DataFrame({'time': time, 'target': np.copy(target)})
+            df.to_csv(os.path.join(save_path_targets, f"JETno{shot_nr}.csv"), index=False)
+        except:
+            print(f"Error in saving target for shot {shot_nr}")
+            non_existing_shots.append(shot_nr)
 
-    return targets
+    return targets, non_existing_shots
 
 def save_no_re_targets(NO_RE_numbers, base_path, save_path_targets):
     '''
