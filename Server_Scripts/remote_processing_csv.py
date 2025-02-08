@@ -7,6 +7,7 @@ import h5py
 import pickle
 import tempfile
 import shutil
+from scipy.ndimage import gaussian_filter1d
 
 def convert_to_standard_format(data):
     """
@@ -111,7 +112,7 @@ def process_h5_file(file_path):
 
     return processed_data
 
-def downsample_timeseries(begin_time, end_time, time_series, signal_series, timestep_size=1e-3):
+def downsample_timeseries(begin_time, end_time, time_series, signal_series, timestep_size=1e-3, sigma=2):
     """
     Downsample a timeseries using interpolation within a specified time range.
     
@@ -121,6 +122,7 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, time
     - time_series: Array of time points from the original data.
     - signal_series: Corresponding signal values.
     - timestep_size: The desired time step between samples.
+    - sigma: The standard deviation for the Gaussian filter.
     
     Returns:
     - downsampled_time: New time array with fixed time step.
@@ -145,6 +147,9 @@ def downsample_timeseries(begin_time, end_time, time_series, signal_series, time
 
     # Interpolate the signal at the downsampled time points
     downsampled_signal = np.interp(downsampled_time, filtered_time_series, filtered_signal_series)
+
+   # Smooth using a moving average
+    downsampled_signal = gaussian_filter1d(downsampled_signal, sigma=sigma)  # Apply Gaussian smoothing
 
     return downsampled_time, downsampled_signal
 
@@ -211,7 +216,7 @@ def process_and_save_as_csv(file_path, output_folder):
 
 def main():
     remote_path = "/Lac8_D/DEFUSE/DEFUSE_DB/DB_mat/"
-    output_folder = "/home/tost/NoTivoli/downsampled_csvs/"
+    output_folder = "/home/tost/NoTivoli/downsampled_csvs_nodtIP_conv"
 
     # Check if the output folder exists; if not, create it
     if not os.path.exists(output_folder):
@@ -220,7 +225,7 @@ def main():
     remote_files = os.listdir(remote_path)
     jet_files = [file for file in remote_files if 'JET' in file and (file.endswith('.mat') or file.endswith('.h5'))]
     # random.shuffle(jet_files)  # Shuffle the list to get a statistical value
-    # jet_files = jet_files[:100]  # Limit the number of files to process for testing
+    #jet_files = jet_files[:10]  # Limit the number of files to process for testing
 
     for file_name in jet_files:
         file_path = os.path.join(remote_path, file_name)
