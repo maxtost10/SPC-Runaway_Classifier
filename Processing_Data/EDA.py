@@ -34,14 +34,25 @@ def compute_feature_statistics(dataframes, RE_valid, features):
         
         for RE_key in RE_valid:
             try:
-                # Extract the feature values as a NumPy array and store them in temp
-                temp.append(dataframes[RE_key][feature].to_numpy())
+                if len(dataframes[RE_key][feature]) == 0:
+                    print(f"DataFrame '{RE_key}' is empty for feature '{feature}'.")
+                    continue
+                # Extract the feature values as a NumPy array and append to temp
+                values = dataframes[RE_key][feature].to_numpy()
+                if values.size > 0:  # Ensure the array is not empty
+                    temp.append(values)
             except Exception as e:
                 print(f"Error processing feature '{feature}' in DataFrame '{RE_key}': {e}")
                 continue  # Skip this DataFrame and proceed to the next one
-        
-        # Store the global minimum and maximum values of the feature
-        features_extrema[feature] = (np.min(temp), np.max(temp))
+
+        # Ensure temp is not empty before computing min and max
+        if temp:
+            # Flatten temp into a single array
+            temp_flat = np.concatenate([arr for arr in temp if arr.size > 0])
+            features_extrema[feature] = (np.min(temp_flat), np.max(temp_flat))
+        else:
+            print(f"Warning: No valid data for feature '{feature}'")
+            features_extrema[feature] = (None, None)  # Handle case where no data is available
 
     # Dictionary to store the density estimates for each feature
     features_densities = {}
@@ -117,6 +128,41 @@ def check_nans_infs(dataframes):
         # If the DataFrame contains Infs, print the count
         if infs > 0:
             print(f"DataFrame {key}: {infs} Infs found.")
+
+def check_nans_infs_pdf(dataframes, drop=True):
+    """
+    Checks each DataFrame in the given dictionary for NaN (Not a Number)
+    and Inf (Infinity) values. Replaces NaN values with zeros.
+    
+    Parameters:
+    - dataframes (dict): A dictionary where the keys are identifiers for
+      DataFrames and the values are pandas DataFrame objects.
+      
+    Returns:
+    - None: The function prints the count of NaNs and Infs for each DataFrame.
+    """
+    
+    # Iterate over each DataFrame in the dictionary
+    for key, df in dataframes.items():
+        # Count the total number of NaNs in the DataFrame
+        nans = df.isna().sum().sum()
+        
+        # Count the total number of Infs in the DataFrame
+        infs = np.isinf(df).sum().sum()
+        
+        # If the DataFrame contains NaNs, replace them with zeros and print a message
+        if nans > 0:
+            if drop:
+                print(f"DataFrame {key}: {nans} NaNs found. Dropping rows with NaNs.")
+                df.dropna(inplace=True)
+        
+        # If the DataFrame contains Infs, print the count
+        if infs > 0:
+            if drop:
+                print(f"DataFrame {key}: {infs} Infs found. Dropping them.")
+                df.replace([np.inf, -np.inf], np.nan, inplace=True)
+                df.dropna(inplace=True)
+
 
 
 
