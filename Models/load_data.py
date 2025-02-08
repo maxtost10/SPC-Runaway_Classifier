@@ -17,8 +17,7 @@ def load_all_data(path, features_list, features_sequence = ['SSXcore', 'IPLA', '
     - all_x: A 2D NumPy array containing all feature datapoints.
     - all_y: A 1D NumPy array containing all target values.
     """
-    random.seed(42)
-    random.shuffle(features_list) # Shuffle the list of files to avoid bias
+    
     test_size = int(len(features_list) * test_size)
     mini_test_size = int(len(features_list) * mini_test_size)
     test_list = features_list[:test_size]
