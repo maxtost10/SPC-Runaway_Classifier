@@ -89,7 +89,7 @@ class IndependentCSVDatasetTCN(Dataset):
 
 
 class IndependentCSVDataset(Dataset):
-    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=50, stride=10):
+    def __init__(self, data_path, features_list, features_sequence=None, transform=None, seq_length=6000, window=30, stride=10):
         """
         Loads each CSV file and applies a sliding window to create independent samples (x, y).
         
@@ -226,6 +226,7 @@ class LSTMModel(nn.Module):
 
         # Sigmoid activation for binary classification
         self.sigmoid = nn.Sigmoid()
+        self.relu = nn.ReLU()
 
     def forward(self, x):
         # Forward propagate LSTM
@@ -233,7 +234,7 @@ class LSTMModel(nn.Module):
 
         # Fully connected layers
         out = self.fc1(out)
-        out = self.sigmoid(out)
+        out = self.relu(out)
         out = self.fc2(out)
         # out = self.sigmoid(out)
 
